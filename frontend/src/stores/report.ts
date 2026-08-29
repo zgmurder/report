@@ -41,7 +41,7 @@ export const useReportStore = defineStore('report', {
     },
     async createBlankReport(title = '未命名警情报告', folderId?: number | null) {
       const report = await createReport({ title, report_type: 'incident', source_query: {}, folder_id: folderId })
-      await this.loadReports()
+      await Promise.all([this.loadReports(), this.loadFolders()])
       this.currentReport = report
       return report
     },
@@ -62,13 +62,13 @@ export const useReportStore = defineStore('report', {
     },
     async moveReport(id: number, folderId: number | null) {
       const report = await updateReport(id, { folder_id: folderId })
-      await this.loadReports()
+      await Promise.all([this.loadReports(), this.loadFolders()])
       if (this.currentReport?.id === id) this.currentReport = report
       return report
     },
     async removeReport(id: number) {
       await deleteReport(id)
-      await this.loadReports()
+      await Promise.all([this.loadReports(), this.loadFolders()])
       if (this.currentReport?.id === id) {
         this.currentReport = null
         this.editingContent = null

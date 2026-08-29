@@ -67,6 +67,16 @@ function createFolder() {
   folderModalVisible.value = true
 }
 
+async function createBlankInFolder(folderId: number | null) {
+  try {
+    const report = await store.createBlankReport('未命名报告', folderId)
+    if (folderId !== null) selectedFolderId.value = folderId
+    router.push(`/home/editor/${report.id}`)
+  } catch {
+    message.error('新建报告失败，请检查后端服务')
+  }
+}
+
 async function renameFolder(folder: ReportFolderItem, name: string) {
   try {
     await store.renameFolder(folder.id, name)
@@ -103,9 +113,7 @@ async function submitFolder() {
 function deleteFolder(folder: { id: number; name: string; report_count: number }) {
   dialog.warning({
     title: '删除目录',
-    content: folder.report_count > 0
-      ? `目录“${folder.name}”下有 ${folder.report_count} 份报告，删除后这些报告将移到未分类，确定删除吗？`
-      : `确定删除目录“${folder.name}”吗？`,
+    content: `确定删除空目录“${folder.name}”吗？`,
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: async () => {
@@ -128,6 +136,25 @@ async function renameReport(report: ReportItem, title: string) {
   } catch {
     message.error('重命名报告失败')
   }
+}
+
+function deleteReport(report: ReportItem) {
+  dialog.warning({
+    title: '删除报告',
+    content: `确定删除报告“${report.title}”吗？删除后不可恢复。`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        const deletingCurrent = report.id === reportId.value
+        await store.removeReport(report.id)
+        message.success('报告已删除')
+        if (deletingCurrent) router.push('/home/reports')
+      } catch {
+        message.error('删除报告失败')
+      }
+    },
+  })
 }
 
 function openReport(report: ReportItem) {
@@ -177,9 +204,11 @@ onMounted(async () => {
       @select-folder="selectedFolderId = $event"
       @open-report="openReport"
       @create-folder="createFolder"
+      @create-report="createBlankInFolder"
       @rename-folder="renameFolder"
       @rename-report="renameReport"
       @delete-folder="deleteFolder"
+      @delete-report="deleteReport"
       @refresh="loadAll"
       @templates="router.push('/home/templates')"
     />

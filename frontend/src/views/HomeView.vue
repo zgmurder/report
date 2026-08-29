@@ -31,10 +31,11 @@ async function load() {
   }
 }
 
-async function createBlank() {
+async function createBlank(folderId: number | null = selectedFolderId.value) {
   try {
-    const report = await store.createBlankReport('未命名报告', selectedFolderId.value)
+    const report = await store.createBlankReport('未命名报告', folderId)
     selectedReportId.value = report.id
+    if (folderId !== null) selectedFolderId.value = folderId
     router.push(`/home/editor/${report.id}`)
   } catch {
     message.error('新建报告失败，请检查后端服务')
@@ -82,9 +83,7 @@ async function submitFolder() {
 function deleteFolder(folder: { id: number; name: string; report_count: number }) {
   dialog.warning({
     title: '删除目录',
-    content: folder.report_count > 0
-      ? `目录“${folder.name}”下有 ${folder.report_count} 份报告，删除后这些报告将移到未分类，确定删除吗？`
-      : `确定删除目录“${folder.name}”吗？`,
+    content: `确定删除空目录“${folder.name}”吗？`,
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: async () => {
@@ -109,6 +108,24 @@ async function renameReport(report: ReportItem, title: string) {
   }
 }
 
+function deleteReport(report: ReportItem) {
+  dialog.warning({
+    title: '删除报告',
+    content: `确定删除报告“${report.title}”吗？删除后不可恢复。`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await store.removeReport(report.id)
+        if (selectedReportId.value === report.id) selectedReportId.value = null
+        message.success('报告已删除')
+      } catch {
+        message.error('删除报告失败')
+      }
+    },
+  })
+}
+
 function openReport(report: ReportItem) {
   selectedReportId.value = report.id
   router.push(`/home/editor/${report.id}`)
@@ -128,16 +145,18 @@ onMounted(load)
       @select-folder="selectedFolderId = $event"
       @open-report="openReport"
       @create-folder="createFolder"
+      @create-report="createBlank"
       @rename-folder="renameFolder"
       @rename-report="renameReport"
       @delete-folder="deleteFolder"
+      @delete-report="deleteReport"
       @refresh="load"
       @templates="router.push('/home/templates')"
     />
 
     <section class="workspace">
       <div class="empty-stage">
-        <button class="create-card" type="button" @click="createBlank">
+        <button class="create-card" type="button" @click="createBlank()">
           <n-icon :component="FilePlus2" :size="48" class="create-icon" />
           <span>新建空白报告</span>
         </button>

@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+
+from app.core.timeutil import to_iso_cn
 
 ReportStatus = Literal["draft", "confirmed", "archived"]
 
@@ -55,6 +57,10 @@ class ReportItem(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_datetime(self, value: datetime) -> str:
+        return to_iso_cn(value)
+
 
 class ReportDetail(ReportItem):
     source_query: dict[str, Any] = Field(default_factory=dict)
@@ -88,3 +94,7 @@ class ReportFolderItem(BaseModel):
     report_count: int = 0
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_datetime(self, value: datetime) -> str:
+        return to_iso_cn(value)

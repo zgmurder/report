@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
 settings = get_settings()
 engine = create_engine(
     settings.database_url,
-    connect_args={"charset": "utf8mb4", "use_unicode": True},
+    connect_args={"charset": "utf8mb4", "use_unicode": True, "init_command": "SET time_zone = '+08:00'"},
     pool_pre_ping=True,
     pool_recycle=1800,
     future=True,
