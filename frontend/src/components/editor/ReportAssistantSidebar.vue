@@ -10,6 +10,7 @@ import {
   NIcon,
   NSelect,
   NSpace,
+  NTreeSelect,
   NTabPane,
   NTabs,
   NDatePicker,
@@ -24,7 +25,7 @@ const emit = defineEmits<{
 }>()
 
 const departmentStore = useDepartmentStore()
-const deptOptions = computed(() => departmentStore.options)
+const deptOptions = computed(() => departmentStore.treeOptions)
 const activeMode = ref<'atomic' | 'ai' | 'component'>('atomic')
 const activePreset = ref('本月')
 const timePresets = ['昨天', '今天', '本周', '上周', '本月', '上月', '本年', '去年']
@@ -94,7 +95,7 @@ function resetParams() {
 }
 
 onMounted(() => {
-  departmentStore.loadDepartments().catch(() => {
+  departmentStore.loadDepartmentTree().catch(() => {
     // 部门接口不可用时保持空态，不影响报告编辑主流程。
   })
 })
@@ -150,7 +151,7 @@ onMounted(() => {
             <div class="field-row">
               <div class="field">
                 <div class="field-label">部门</div>
-                <n-select v-model:value="department" :options="deptOptions" clearable placeholder="请选择" />
+                <n-tree-select v-model:value="department" :options="deptOptions" clearable default-expand-all placeholder="请选择" />
               </div>
               <div class="field">
                 <div class="field-label">责任警员</div>

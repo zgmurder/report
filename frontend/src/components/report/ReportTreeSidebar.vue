@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { NButton, NIcon, NSelect, NTooltip } from 'naive-ui'
+import { NButton, NIcon, NTooltip, NTreeSelect } from 'naive-ui'
 import { BookOpen, FileText, FolderOpen, FolderPlus, PanelLeftClose, RefreshCw } from 'lucide-vue-next'
 import type { ReportFolderItem, ReportItem } from '@/api/report'
 import { useDepartmentStore } from '@/stores/department'
@@ -25,7 +25,7 @@ const emit = defineEmits<{
 const departmentStore = useDepartmentStore()
 const folderExpanded = ref(true)
 const dept = ref<string | null>(null)
-const deptOptions = computed(() => departmentStore.options)
+const deptOptions = computed(() => departmentStore.treeOptions)
 
 const displayReports = computed(() => props.reports)
 const reportCount = computed(() => displayReports.value.length)
@@ -54,7 +54,7 @@ function chooseFolder(id: number) {
 }
 
 watch(
-  () => departmentStore.departments,
+  () => departmentStore.departmentTree,
   (departments) => {
     if (!dept.value && departments.length) dept.value = departments[0].code
   },
@@ -62,7 +62,7 @@ watch(
 )
 
 onMounted(() => {
-  departmentStore.loadDepartments().catch(() => {
+  departmentStore.loadDepartmentTree().catch(() => {
     // 部门接口不可用时下拉保持空态，不影响目录/报告功能。
   })
 })
@@ -94,7 +94,7 @@ onMounted(() => {
       </div>
 
       <div class="dept-wrap">
-        <n-select v-model:value="dept" :options="deptOptions" size="medium" />
+        <n-tree-select v-model:value="dept" :options="deptOptions" size="medium" default-expand-all />
       </div>
 
       <div class="tree">

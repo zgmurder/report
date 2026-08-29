@@ -35,7 +35,7 @@ class DepartmentRepository:
         self.db.commit()
 
     def list(self, include_disabled: bool = False) -> list:
-        external_rows = self._list_police_stations_from_jz_dept(include_disabled=include_disabled)
+        external_rows = self._list_jz_dept_root_and_police_stations(include_disabled=include_disabled)
         if external_rows:
             return external_rows
 
@@ -46,14 +46,22 @@ class DepartmentRepository:
         stmt = stmt.order_by(Department.sort_order.asc(), Department.id.asc())
         return list(self.db.scalars(stmt).all())
 
-    def _list_police_stations_from_jz_dept(self, include_disabled: bool = False) -> list:
+    def tree(self, include_disabled: bool = False) -> list[DepartmentTreeItem]:
+        external_rows = self._list_jz_dept_root_and_police_stations(include_disabled=include_disabled)
+        if external_rows:
+            return self._build_tree(external_rows)
+
+        rows = self.list(include_disabled=include_disabled)
+        return self._build_tree(rows)
+
+    def _list_jz_dept_root_and_police_stations(self, include_disabled: bool = False) -> list:
         if not self._table_exists("jz_dept"):
             return []
 
         conditions = [
-            "(short_dept_name LIKE :keyword OR detail_dept_name LIKE :keyword)",
+            "(dept_code = :root_dept_code OR short_dept_name LIKE :keyword OR detail_dept_name LIKE :keyword)",
         ]
-        params = {"keyword": "%派出所%"}
+        params = {"root_dept_code": "330782000000", "keyword": "%派出所%"}
         if not include_disabled:
             conditions.extend([
                 "COALESCE(del_flag, '0') = '0'",
@@ -81,10 +89,10 @@ class DepartmentRepository:
         now = datetime.now()
         return [
             SimpleNamespace(
-                id=index,
+                id=self._dept_id(row["dept_code"], index),
                 name=row["name"],
                 code=row["dept_code"],
-                parent_id=None,
+                parent_id=self._dept_id(row["parent_dept_code"], None),
                 parent_code=row["parent_dept_code"],
                 sort_order=int(row["sort_order"] or 0),
                 status="enabled" if row["status"] == "0" else "disabled",
@@ -93,6 +101,12 @@ class DepartmentRepository:
             )
             for index, row in enumerate(rows, start=1)
         ]
+
+    @staticmethod
+    def _dept_id(code: str | None, fallback: int | None) -> int | None:
+        if code and code.isdigit():
+            return int(code)
+        return fallback
 
     def _table_exists(self, table_name: str) -> bool:
         return bool(
@@ -109,8 +123,7 @@ class DepartmentRepository:
             ).scalar()
         )
 
-    def tree(self, include_disabled: bool = False) -> list[DepartmentTreeItem]:
-        rows = self.list(include_disabled=include_disabled)
+    def _build_tree(self, rows: list) -> list[DepartmentTreeItem]:
         nodes = {row.id: self._to_tree_item(row) for row in rows}
         roots: list[DepartmentTreeItem] = []
         for row in rows:
