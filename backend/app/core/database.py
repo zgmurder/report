@@ -28,7 +28,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     if engine.dialect.name == "mysql":
         with engine.begin() as conn:
-            for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs"):
+            for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs", "departments"):
                 conn.execute(text(f"ALTER TABLE {table_name} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
             has_folder_id = conn.execute(
                 text(
