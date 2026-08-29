@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { NButton, NCard, NForm, NFormItem, NInput, NModal, NSpace, useMessage } from 'naive-ui'
 import type { ReportContent, ReportItem } from '@/api/report'
 import ReportAssistantSidebar from '@/components/editor/ReportAssistantSidebar.vue'
 import ReportUmoEditor from '@/components/editor/ReportUmoEditor.vue'
@@ -10,11 +11,15 @@ import { useReportStore } from '@/stores/report'
 const route = useRoute()
 const router = useRouter()
 const store = useReportStore()
+const message = useMessage()
 
 const reportId = computed(() => Number(route.params.id))
 const html = ref('')
 const sidebarCollapsed = ref(false)
 const selectedFolderId = ref<number | null>(null)
+const folderModalVisible = ref(false)
+const folderName = ref('')
+const creatingFolder = ref(false)
 
 const title = computed(() => store.currentReport?.title || store.editingContent?.title || '未命名报告')
 
@@ -56,10 +61,33 @@ async function loadCurrent() {
   }
 }
 
-async function createFolder() {
-  const name = window.prompt('请输入文件夹名称', '新建文件夹')
-  if (!name?.trim()) return
-  await store.createFolder(name.trim())
+function createFolder() {
+  folderName.value = ''
+  folderModalVisible.value = true
+}
+
+function closeFolderModal() {
+  if (creatingFolder.value) return
+  folderModalVisible.value = false
+}
+
+async function submitFolder() {
+  const name = folderName.value.trim()
+  if (!name) {
+    message.warning('请输入目录名称')
+    return
+  }
+  try {
+    creatingFolder.value = true
+    const folder = await store.createFolder(name)
+    selectedFolderId.value = folder.id
+    folderModalVisible.value = false
+    message.success('目录已创建')
+  } catch {
+    message.error('创建目录失败')
+  } finally {
+    creatingFolder.value = false
+  }
 }
 
 function openReport(report: ReportItem) {
@@ -121,6 +149,30 @@ onMounted(async () => {
       @generate-draft="generateDraft"
       @insert-html="insertHtml"
     />
+
+    <n-modal v-model:show="folderModalVisible" :mask-closable="!creatingFolder" transform-origin="center">
+      <n-card class="folder-modal" title="新建目录" :bordered="false" role="dialog" aria-modal="true">
+        <n-form label-placement="top" @submit.prevent="submitFolder">
+          <n-form-item label="目录名称" required>
+            <n-input
+              v-model:value="folderName"
+              maxlength="40"
+              show-count
+              clearable
+              autofocus
+              placeholder="请输入目录名称"
+              @keyup.enter="submitFolder"
+            />
+          </n-form-item>
+        </n-form>
+        <template #footer>
+          <n-space justify="end">
+            <n-button :disabled="creatingFolder" @click="closeFolderModal">取消</n-button>
+            <n-button type="primary" :loading="creatingFolder" @click="submitFolder">创建</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
   </div>
 </template>
 
@@ -137,6 +189,12 @@ onMounted(async () => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.folder-modal {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  border-radius: 8px;
 }
 
 @media (max-width: 1200px) {
