@@ -1,0 +1,27 @@
+{
+  "name": "yw-police-report-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "义乌警情智能报告工作台",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@umoteam/editor": "latest",
+    "@vitejs/plugin-vue": "^5.2.0",
+    "axios": "^1.7.0",
+    "echarts": "^5.5.0",
+    "lucide-vue-next": "^0.468.0",
+    "pinia": "^2.2.0",
+    "vue": "^3.5.0",
+    "vue-router": "^4.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vue-tsc": "^2.1.0"
+  }
+}

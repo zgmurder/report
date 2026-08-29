@@ -1,0 +1,108 @@
+:root {
+  --color-primary: #1890ff;
+  --color-primary-hover: #40a9ff;
+  --color-primary-bg: #e6f7ff;
+  --color-primary-border: #91d5ff;
+  --color-text: #262626;
+  --color-text-secondary: #595959;
+  --color-text-muted: #8c8c8c;
+  --color-border: #e8e8e8;
+  --color-border-light: #f0f0f0;
+  --color-bg: #f0f2f5;
+  --color-bg-white: #ffffff;
+  --header-height: 64px;
+  --sidebar-width: 280px;
+  --radius: 4px;
+  --radius-lg: 6px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5715;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+button, input, textarea, select { font: inherit; }
+a { color: var(--color-primary); text-decoration: none; }
+button { cursor: pointer; }
+
+.primary-btn, .ghost-btn, .danger-btn {
+  border: none;
+  border-radius: var(--radius);
+  padding: 5px 16px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all .2s;
+}
+.primary-btn {
+  color: #fff;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+.primary-btn:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+.ghost-btn {
+  color: var(--color-text);
+  background: #fff;
+  border: 1px solid #d9d9d9;
+}
+.ghost-btn:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.danger-btn { color: #ff4d4f; background: #fff1f0; border: 1px solid #ffa39e; }
+
+.input, .select, .textarea {
+  width: 100%;
+  height: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 4px 11px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.input:hover, .select:hover, .textarea:hover { border-color: var(--color-primary-hover); }
+.input:focus, .select:focus, .textarea:focus {
+  border-color: var(--color-primary-hover);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, .2);
+}
+.textarea { min-height: 88px; height: auto; resize: vertical; padding: 8px 11px; }
+
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: 12px 16px; border-bottom: 1px solid var(--color-border-light); text-align: left; }
+.table th { color: var(--color-text-secondary); font-weight: 500; background: #fafafa; }
+.table td { color: var(--color-text); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 22px;
+  border-radius: var(--radius);
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  font-size: 12px;
+  border: 1px solid var(--color-primary-border);
+}
+.muted { color: var(--color-text-muted); }
+
+/* 兼容旧页面卡片样式 */
+.glass-card {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .04);
+}
+
+.workbench-bg {
+  min-height: 100%;
+  background: var(--color-bg);
+}
+
+.page-wrap {
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+  background: var(--color-bg);
+}

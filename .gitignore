@@ -1,0 +1,13 @@
+.env
+backend/.env
+backend/.venv/
+backend/venv/
+frontend/node_modules/
+frontend/dist/
+backend/__pycache__/
+backend/app/**/__pycache__/
+**/__pycache__/
+*.py[cod]
+*.log
+*.pid
+dist/
