@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { NButton, NIcon, NTooltip, NTreeSelect } from 'naive-ui'
 import { BookOpen, FileText, FolderOpen, FolderPlus, PanelLeftClose, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 import type { ReportFolderItem, ReportItem } from '@/api/report'
@@ -19,6 +19,7 @@ const emit = defineEmits<{
   'open-report': [report: ReportItem]
   'create-folder': []
   'rename-folder': [folder: ReportFolderItem]
+  'rename-report': [report: ReportItem]
   'delete-folder': [folder: ReportFolderItem]
   refresh: []
   templates: []
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 const departmentStore = useDepartmentStore()
 const folderExpanded = ref(true)
 const dept = ref<string | null>(null)
+const activeTarget = ref<{ type: 'folder'; id: number } | { type: 'report'; id: number } | null>(null)
 const deptOptions = computed(() => departmentStore.treeOptions)
 
 const displayReports = computed(() => props.reports)
@@ -51,8 +53,50 @@ function formatTime(value: string) {
 
 function chooseFolder(id: number) {
   const nextId = id === 0 || props.selectedFolderId === id ? null : id
+  activeTarget.value = nextId === null ? null : { type: 'folder', id }
   emit('select-folder', nextId)
   folderExpanded.value = true
+}
+
+function openReport(report: ReportItem) {
+  activeTarget.value = { type: 'report', id: report.id }
+  emit('open-report', report)
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName.toLowerCase()
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable || !!target.closest('[contenteditable="true"]')
+}
+
+function renameActiveTarget() {
+  if (activeTarget.value?.type === 'report') {
+    const report = props.reports.find((item) => item.id === activeTarget.value?.id)
+    if (report) {
+      emit('rename-report', report)
+      return
+    }
+  }
+  if (activeTarget.value?.type === 'folder') {
+    const folder = props.folders.find((item) => item.id === activeTarget.value?.id)
+    if (folder) {
+      emit('rename-folder', folder)
+      return
+    }
+  }
+  const selectedReport = props.reports.find((item) => item.id === props.selectedReportId)
+  if (selectedReport) {
+    emit('rename-report', selectedReport)
+    return
+  }
+  const selectedFolder = props.folders.find((item) => item.id === props.selectedFolderId)
+  if (selectedFolder) emit('rename-folder', selectedFolder)
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key !== 'F2' || props.collapsed || isEditableTarget(event.target)) return
+  event.preventDefault()
+  renameActiveTarget()
 }
 
 watch(
@@ -64,9 +108,14 @@ watch(
 )
 
 onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
   departmentStore.loadDepartmentTree().catch(() => {
     // 部门接口不可用时下拉保持空态，不影响目录/报告功能。
   })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -139,7 +188,7 @@ onMounted(() => {
             class="file-row"
             type="button"
             :class="{ active: selectedReportId === report.id }"
-            @click="emit('open-report', report)"
+            @click="openReport(report)"
           >
             <n-icon :component="FileText" :size="15" class="file-icon" />
             <div class="file-meta">

@@ -20,6 +20,10 @@ const folderSubmitting = ref(false)
 const editingFolder = ref<ReportFolderItem | null>(null)
 const folderModalTitle = computed(() => editingFolder.value ? '重命名目录' : '新建目录')
 const folderSubmitText = computed(() => editingFolder.value ? '保存' : '创建')
+const reportModalVisible = ref(false)
+const reportName = ref('')
+const reportSubmitting = ref(false)
+const editingReport = ref<ReportItem | null>(null)
 
 async function load() {
   try {
@@ -105,6 +109,37 @@ function deleteFolder(folder: { id: number; name: string; report_count: number }
   })
 }
 
+function renameReport(report: ReportItem) {
+  editingReport.value = report
+  reportName.value = report.title
+  selectedReportId.value = report.id
+  reportModalVisible.value = true
+}
+
+function closeReportModal() {
+  if (reportSubmitting.value) return
+  reportModalVisible.value = false
+}
+
+async function submitReportName() {
+  const name = reportName.value.trim()
+  if (!name) {
+    message.warning('请输入报告名称')
+    return
+  }
+  if (!editingReport.value) return
+  try {
+    reportSubmitting.value = true
+    await store.renameReport(editingReport.value.id, name)
+    reportModalVisible.value = false
+    message.success('报告已重命名')
+  } catch {
+    message.error('重命名报告失败')
+  } finally {
+    reportSubmitting.value = false
+  }
+}
+
 function openReport(report: ReportItem) {
   selectedReportId.value = report.id
   router.push(`/home/editor/${report.id}`)
@@ -125,6 +160,7 @@ onMounted(load)
       @open-report="openReport"
       @create-folder="createFolder"
       @rename-folder="renameFolder"
+      @rename-report="renameReport"
       @delete-folder="deleteFolder"
       @refresh="load"
       @templates="router.push('/home/templates')"
@@ -167,6 +203,30 @@ onMounted(load)
           <n-space justify="end">
             <n-button :disabled="folderSubmitting" @click="closeFolderModal">取消</n-button>
             <n-button type="primary" :loading="folderSubmitting" @click="submitFolder">{{ folderSubmitText }}</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
+
+    <n-modal v-model:show="reportModalVisible" :mask-closable="!reportSubmitting" transform-origin="center">
+      <n-card class="folder-modal" title="重命名报告" :bordered="false" role="dialog" aria-modal="true">
+        <n-form label-placement="top" @submit.prevent="submitReportName">
+          <n-form-item label="报告名称" required>
+            <n-input
+              v-model:value="reportName"
+              maxlength="80"
+              show-count
+              clearable
+              autofocus
+              placeholder="请输入报告名称"
+              @keyup.enter="submitReportName"
+            />
+          </n-form-item>
+        </n-form>
+        <template #footer>
+          <n-space justify="end">
+            <n-button :disabled="reportSubmitting" @click="closeReportModal">取消</n-button>
+            <n-button type="primary" :loading="reportSubmitting" @click="submitReportName">保存</n-button>
           </n-space>
         </template>
       </n-card>
