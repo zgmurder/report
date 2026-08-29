@@ -28,7 +28,7 @@ function toOptions(items: DepartmentItem[]): TreeSelectOption[] {
     const children = item.children?.length ? toOptions(item.children) : undefined
     return {
       label: item.name,
-      value: item.code,
+      key: item.code,
       ...(children ? { children } : {}),
     }
   })
