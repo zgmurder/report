@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Download, PanelRightClose, RefreshCw, Save, Sparkles } from 'lucide-vue-next'
-import { generateReportDraft, type ReportContent } from '@/api/report'
+import type { ReportContent } from '@/api/report'
 import ReportUmoEditor from '@/components/editor/ReportUmoEditor.vue'
 import { useReportStore } from '@/stores/report'
 
@@ -24,8 +24,7 @@ function escapeHtml(value: string) {
 }
 
 async function generateDraft() {
-  const result = await generateReportDraft(reportId, { report_type: 'monthly', source_query: {} })
-  store.editingContent = result.draft_json
+  const result = await store.generateDraft(reportId, 'monthly', {})
   html.value = contentToHtml(result.draft_json)
 }
 
@@ -36,13 +35,13 @@ async function save(value = html.value) {
     params: {},
     sections: [{ id: 'umo_content', title: '报告正文', type: 'html', content: value, blocks: [], source: [], ai_generated: false }],
   }
-  await store.save(reportId, content)
+  await store.save(reportId, content, value)
   html.value = value
 }
 
 onMounted(async () => {
   await store.loadReport(reportId)
-  html.value = contentToHtml(store.editingContent)
+  html.value = store.htmlSnapshot || contentToHtml(store.editingContent)
 })
 </script>
 

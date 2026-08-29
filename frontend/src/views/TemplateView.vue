@@ -12,7 +12,7 @@
         </div>
         <div class="template-grid">
           <article v-for="tpl in templates" :key="tpl.name" class="template-card">
-            <h3>{{ tpl.name }}</h3><p>{{ tpl.desc }}</p><span class="badge">{{ tpl.status }}</span>
+            <h3>{{ tpl.name }}</h3><p>{{ tpl.description }}</p><span class="badge">{{ tpl.status === 'enabled' ? '启用' : tpl.status }}</span>
           </article>
         </div>
       </section>
@@ -20,12 +20,14 @@
   </div>
 </template>
 <script setup lang="ts">
+import { computed, onMounted } from 'vue'
+import { useCatalogStore } from '@/stores/catalog'
+
+const store = useCatalogStore()
 const types = ['全部模板', '警情日报', '警情周报', '警情月报', '专题报告']
-const templates = [
-  { name: '义乌市警情月报模板', desc: '总体情况、类别分析、区域分析、风险研判', status: '已发布' },
-  { name: '派出所日报模板', desc: '适用于基层所队每日警情快报', status: '草稿' },
-  { name: '专题研判模板', desc: '围绕重点领域和高发类型生成专题报告', status: '已发布' },
-]
+const templates = computed(() => store.templates)
+
+onMounted(() => store.loadTemplates())
 </script>
 <style scoped>
 .two-column { display: grid; grid-template-columns: 240px 1fr; gap: 16px; min-height: calc(100% - 0px); }

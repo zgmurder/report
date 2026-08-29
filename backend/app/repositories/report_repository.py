@@ -1,56 +1,109 @@
-from datetime import datetime
-from typing import Any
+from __future__ import annotations
 
-from app.schemas.report import ReportContent, ReportCreateRequest, ReportDetail, ReportItem
+from app.models.report import ReportDocument, ReportFolder
+from app.schemas.report import ReportContent, ReportCreateRequest, ReportDetail, ReportFolderItem, ReportItem
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 
 class ReportRepository:
-    """报告仓库占位实现。
+    """报告仓库数据库实现。"""
 
-    第一阶段使用进程内存便于跑通接口；正式实现必须替换为数据库权威存储。
-    """
+    def __init__(self, db: Session):
+        self.db = db
 
-    _items: dict[int, dict[str, Any]] = {}
-    _next_id: int = 1
-
-    def create(self, req: ReportCreateRequest) -> ReportDetail:
-        now = datetime.now()
-        report_id = ReportRepository._next_id
-        ReportRepository._next_id += 1
-        item = {
-            "id": report_id,
-            "title": req.title,
-            "report_type": req.report_type,
-            "status": "draft",
-            "source_query": req.source_query,
-            "content_json": None,
-            "draft_json": None,
-            "created_at": now,
-            "updated_at": now,
-        }
-        ReportRepository._items[report_id] = item
-        return ReportDetail(**item)
+    def create(self, req: ReportCreateRequest, created_by: int | None = None) -> ReportDetail:
+        row = ReportDocument(
+            title=req.title,
+            report_type=req.report_type,
+            status="draft",
+            folder_id=req.folder_id,
+            source_query=req.source_query,
+            created_by=created_by,
+        )
+        self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return self._to_detail(row)
 
     def list(self) -> list[ReportItem]:
-        return [ReportItem(**item) for item in sorted(ReportRepository._items.values(), key=lambda x: x["id"], reverse=True)]
+        rows = self.db.scalars(select(ReportDocument).order_by(ReportDocument.updated_at.desc(), ReportDocument.id.desc())).all()
+        return [self._to_item(row) for row in rows]
+
+    def list_folders(self) -> list[ReportFolderItem]:
+        rows = self.db.scalars(select(ReportFolder).order_by(ReportFolder.sort_order.asc(), ReportFolder.id.asc())).all()
+        counts = dict(self.db.execute(select(ReportDocument.folder_id, func.count()).group_by(ReportDocument.folder_id)).all())
+        return [
+            ReportFolderItem(
+                id=row.id,
+                name=row.name,
+                parent_id=row.parent_id,
+                sort_order=row.sort_order,
+                report_count=counts.get(row.id, 0),
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+            for row in rows
+        ]
+
+    def create_folder(self, name: str, parent_id: int | None = None, created_by: int | None = None) -> ReportFolderItem:
+        row = ReportFolder(name=name, parent_id=parent_id, created_by=created_by)
+        self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return ReportFolderItem(
+            id=row.id,
+            name=row.name,
+            parent_id=row.parent_id,
+            sort_order=row.sort_order,
+            report_count=0,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
 
     def get(self, report_id: int) -> ReportDetail | None:
-        item = ReportRepository._items.get(report_id)
-        return ReportDetail(**item) if item else None
+        row = self.db.get(ReportDocument, report_id)
+        return self._to_detail(row) if row else None
 
-    def save_content(self, report_id: int, content: ReportContent) -> ReportDetail | None:
-        item = ReportRepository._items.get(report_id)
-        if not item:
+    def save_content(self, report_id: int, content: ReportContent, html_snapshot: str | None = None) -> ReportDetail | None:
+        row = self.db.get(ReportDocument, report_id)
+        if not row:
             return None
-        item["content_json"] = content.model_dump()
-        item["status"] = "confirmed"
-        item["updated_at"] = datetime.now()
-        return ReportDetail(**item)
+        row.title = content.title or row.title
+        row.report_type = content.type or row.report_type
+        row.content_json = content.model_dump(mode="json")
+        row.html_snapshot = html_snapshot
+        row.status = "confirmed"
+        self.db.commit()
+        self.db.refresh(row)
+        return self._to_detail(row)
 
     def save_draft(self, report_id: int, draft: ReportContent) -> ReportDetail | None:
-        item = ReportRepository._items.get(report_id)
-        if not item:
+        row = self.db.get(ReportDocument, report_id)
+        if not row:
             return None
-        item["draft_json"] = draft.model_dump()
-        item["updated_at"] = datetime.now()
-        return ReportDetail(**item)
+        row.draft_json = draft.model_dump(mode="json")
+        self.db.commit()
+        self.db.refresh(row)
+        return self._to_detail(row)
+
+    def _to_item(self, row: ReportDocument) -> ReportItem:
+        return ReportItem(
+            id=row.id,
+            title=row.title,
+            report_type=row.report_type,
+            status=row.status,
+            folder_id=row.folder_id,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
+    def _to_detail(self, row: ReportDocument) -> ReportDetail:
+        item = self._to_item(row)
+        return ReportDetail(
+            **item.model_dump(),
+            source_query=row.source_query or {},
+            content_json=ReportContent.model_validate(row.content_json) if row.content_json else None,
+            draft_json=ReportContent.model_validate(row.draft_json) if row.draft_json else None,
+            html_snapshot=row.html_snapshot,
+        )

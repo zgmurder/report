@@ -22,19 +22,39 @@ export interface ReportItem {
   title: string
   report_type: string
   status: string
+  folder_id?: number | null
   created_at: string
   updated_at: string
   source_query?: Record<string, unknown>
   content_json?: ReportContent | null
   draft_json?: ReportContent | null
+  html_snapshot?: string | null
 }
 
 export function listReports() {
   return apiGet<ReportItem[]>('/reports')
 }
 
-export function createReport(data: { title: string; report_type: string; source_query: Record<string, unknown> }) {
+export interface ReportFolderItem {
+  id: number
+  name: string
+  parent_id?: number | null
+  sort_order: number
+  report_count: number
+  created_at: string
+  updated_at: string
+}
+
+export function createReport(data: { title: string; report_type: string; source_query: Record<string, unknown>; folder_id?: number | null }) {
   return apiPost<ReportItem>('/reports', data)
+}
+
+export function listReportFolders() {
+  return apiGet<ReportFolderItem[]>('/reports/folders')
+}
+
+export function createReportFolder(data: { name: string; parent_id?: number | null }) {
+  return apiPost<ReportFolderItem>('/reports/folders', data)
 }
 
 export function getReport(id: number) {
@@ -45,6 +65,6 @@ export function generateReportDraft(id: number, data: { report_type: string; sou
   return apiPost<{ draft_json: ReportContent; explanation: string; warnings: string[] }>(`/reports/${id}/generate-draft`, data)
 }
 
-export function saveReportContent(id: number, content_json: ReportContent) {
-  return apiPut<ReportItem>(`/reports/${id}/content`, { content_json })
+export function saveReportContent(id: number, content_json: ReportContent, html_snapshot?: string) {
+  return apiPut<ReportItem>(`/reports/${id}/content`, { content_json, html_snapshot })
 }

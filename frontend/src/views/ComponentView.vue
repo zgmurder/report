@@ -8,17 +8,23 @@
     <table class="table">
       <thead><tr><th>组件名称</th><th>类型</th><th>数据源</th><th>用途</th><th>状态</th><th>操作</th></tr></thead>
       <tbody>
-        <tr v-for="item in items" :key="item.name"><td>{{ item.name }}</td><td>{{ item.type }}</td><td>{{ item.source }}</td><td>{{ item.usage }}</td><td><span class="badge">启用</span></td><td><button class="link-btn">编辑</button><button class="link-btn">预览</button></td></tr>
+        <tr v-for="item in items" :key="item.id"><td>{{ item.name }}</td><td>{{ componentTypeLabel(item.component_type) }}</td><td>{{ item.data_source }}</td><td>{{ item.usage }}</td><td><span class="badge">{{ item.status === 'enabled' ? '启用' : item.status }}</span></td><td><button class="link-btn">编辑</button><button class="link-btn">预览</button></td></tr>
       </tbody>
     </table>
   </section>
 </template>
 <script setup lang="ts">
-const items = [
-  { name: '警情总量', type: '文本', source: '本地警情库', usage: '总体情况' },
-  { name: '类别排行', type: '表格', source: '本地警情库', usage: '类别分析' },
-  { name: '日趋势', type: '图表', source: '本地警情库', usage: '趋势分析' },
-]
+import { computed, onMounted } from 'vue'
+import { useCatalogStore } from '@/stores/catalog'
+
+const store = useCatalogStore()
+const items = computed(() => store.components)
+
+function componentTypeLabel(type: string) {
+  return ({ text: '文本', table: '表格', chart: '图表' } as Record<string, string>)[type] || type
+}
+
+onMounted(() => store.loadComponents())
 </script>
 <style scoped>
 .content-card { padding:22px; }

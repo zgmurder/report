@@ -11,10 +11,14 @@ import {
   PanelLeftClose,
   RefreshCw,
 } from 'lucide-vue-next'
-import { createReport, listReports, type ReportItem } from '@/api/report'
+import type { ReportFolderItem, ReportItem } from '@/api/report'
+import { useReportStore } from '@/stores/report'
 
 const router = useRouter()
+const store = useReportStore()
 const reports = ref<ReportItem[]>([])
+const folders = ref<ReportFolderItem[]>([])
+const selectedFolderId = ref<number | null>(null)
 const selectedReportId = ref<number | null>(null)
 const sidebarCollapsed = ref(false)
 const folderExpanded = ref(true)
@@ -43,6 +47,8 @@ const displayReports = computed(() => {
 })
 
 const reportCount = computed(() => displayReports.value.length)
+const visibleFolders = computed(() => folders.value.length ? folders.value : [{ id: 0, name: '测试报告', parent_id: null, sort_order: 0, report_count: displayReports.value.length, created_at: '', updated_at: '' }])
+const visibleReports = computed(() => selectedFolderId.value ? displayReports.value.filter((report) => report.folder_id === selectedFolderId.value) : displayReports.value)
 
 function formatTime(value: string) {
   if (!value) return ''
@@ -57,15 +63,24 @@ function formatTime(value: string) {
 
 async function load() {
   try {
-    reports.value = await listReports()
+    const [loadedReports, loadedFolders] = await Promise.all([store.loadReports(), store.loadFolders()])
+    reports.value = loadedReports
+    folders.value = loadedFolders
   } catch {
     reports.value = []
   }
 }
 
+async function createFolder() {
+  const name = window.prompt('请输入文件夹名称', '新建文件夹')
+  if (!name?.trim()) return
+  await store.createFolder(name.trim())
+  await load()
+}
+
 async function createBlank() {
   try {
-    const report = await createReport({ title: '未命名报告', report_type: 'incident', source_query: {} })
+    const report = await store.createBlankReport('未命名报告', selectedFolderId.value)
     await load()
     selectedReportId.value = report.id
     router.push(`/editor/${report.id}`)
@@ -98,7 +113,7 @@ onMounted(load)
         <div class="sidebar-head">
           <h3>报告</h3>
           <div class="head-actions">
-            <button class="icon-btn" type="button" title="新建文件夹">
+            <button class="icon-btn" type="button" title="新建文件夹" @click="createFolder">
               <FolderPlus :size="16" :stroke-width="1.75" />
             </button>
             <button class="icon-btn" type="button" title="刷新" @click="refresh">
@@ -115,14 +130,22 @@ onMounted(load)
         <div class="tree">
           <div class="tree-summary">全部报告 ({{ reportCount }})</div>
 
-          <button class="folder-row" type="button" @click="folderExpanded = !folderExpanded">
+          <button
+            v-for="folder in visibleFolders"
+            :key="folder.id"
+            class="folder-row"
+            type="button"
+            :class="{ active: selectedFolderId === folder.id }"
+            @click="selectedFolderId = selectedFolderId === folder.id ? null : folder.id; folderExpanded = true"
+          >
             <FolderOpen :size="16" :stroke-width="1.75" class="folder-icon" />
-            <span>测试报告</span>
+            <span>{{ folder.name }}</span>
+            <em>{{ folder.report_count }}</em>
           </button>
 
           <div v-show="folderExpanded" class="file-list">
             <button
-              v-for="report in displayReports"
+              v-for="report in visibleReports"
               :key="report.id"
               class="file-row"
               type="button"
@@ -280,8 +303,19 @@ onMounted(load)
   font-weight: 500;
 }
 
-.folder-row:hover {
+.folder-row:hover,
+.folder-row.active {
   background: #f5f5f5;
+}
+
+.folder-row span {
+  flex: 1;
+}
+
+.folder-row em {
+  color: #8c8c8c;
+  font-style: normal;
+  font-size: 12px;
 }
 
 .folder-icon {
