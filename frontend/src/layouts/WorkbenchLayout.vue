@@ -7,6 +7,9 @@ const route = useRoute()
 const router = useRouter()
 
 function isActive(path: string) {
+  if (path === '/home/reports') {
+    return route.path.startsWith('/home/reports') || route.path.startsWith('/home/editor')
+  }
   return route.path === path || route.path.startsWith(`${path}/`)
 }
 </script>

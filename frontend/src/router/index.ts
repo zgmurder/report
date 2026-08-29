@@ -11,6 +11,7 @@ const router = createRouter({
       redirect: '/home/reports',
       children: [
         { path: 'reports', component: () => import('@/views/HomeView.vue') },
+        { path: 'editor/:id', component: () => import('@/views/EditorView.vue') },
         { path: 'templates', component: () => import('@/views/TemplateView.vue') },
         { path: 'components', component: () => import('@/views/ComponentView.vue') },
         { path: 'data-sources', component: () => import('@/views/DataSourceView.vue') },
@@ -22,7 +23,7 @@ const router = createRouter({
         { path: 'folders', component: () => import('@/views/FolderView.vue') },
       ],
     },
-    { path: '/editor/:id', component: () => import('@/views/EditorView.vue') },
+    { path: '/editor/:id', redirect: (to) => `/home/editor/${to.params.id}` },
   ],
 })
 

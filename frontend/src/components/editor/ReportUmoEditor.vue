@@ -10,7 +10,7 @@ const props = withDefaults(
     readOnly?: boolean
   }>(),
   {
-    title: '警情智能报告',
+    title: '未命名报告',
     modelValue: '',
     readOnly: false,
   },
@@ -21,12 +21,16 @@ const emit = defineEmits<{
   save: [value: string]
 }>()
 
+function escapeHtml(value: string) {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 const editorOptions = computed(() => ({
   locale: 'zh-CN',
   height: '100%',
   document: {
     title: props.title,
-    content: props.modelValue,
+    content: props.modelValue || `<h1 style="text-align:center;">${escapeHtml(props.title)}</h1><p></p>`,
     placeholder: {
       zh_CN: '请在此编辑警情研判报告...',
       en_US: 'Edit report here...',
@@ -35,14 +39,23 @@ const editorOptions = computed(() => ({
     autofocus: false,
     enableBubbleMenu: !props.readOnly,
     enableBlockMenu: !props.readOnly,
-    autoSave: { enabled: false },
+    autoSave: {
+      enabled: true,
+      interval: 30,
+    },
   },
   toolbar: {
     showSaveLabel: !props.readOnly,
     defaultMode: 'classic',
-    menus: ['base', 'insert', 'table', 'page', 'view'],
+    menus: ['base', 'insert', 'table', 'tools', 'page', 'export'],
   },
   page: {
+    defaultMargin: {
+      left: 2.54,
+      right: 2.54,
+      top: 2.54,
+      bottom: 2.54,
+    },
     layouts: ['page', 'web'],
     showToc: false,
     showBreakMarks: false,
@@ -55,6 +68,7 @@ const editorOptions = computed(() => ({
   onSave: async (editor: unknown) => {
     const api = editor as { getHTML?: () => string }
     emit('save', api.getHTML?.() || props.modelValue)
+    return true
   },
 }))
 </script>
@@ -68,7 +82,13 @@ const editorOptions = computed(() => ({
 <style scoped>
 .umo-shell {
   height: 100%;
-  min-height: 720px;
-  background: #eef1f6;
+  min-height: 0;
+  background: #f5f6f8;
+}
+
+.umo-shell :deep(.umo-editor),
+.umo-shell :deep(.umo-editor-container),
+.umo-shell :deep(.umo-editor > div) {
+  height: 100% !important;
 }
 </style>

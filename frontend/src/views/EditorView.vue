@@ -1,45 +1,79 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Download, Save, Sparkles } from 'lucide-vue-next'
-import { exportReportHtmlUrl, type ReportContent } from '@/api/report'
+import type { ReportContent, ReportItem } from '@/api/report'
 import ReportAssistantSidebar from '@/components/editor/ReportAssistantSidebar.vue'
 import ReportUmoEditor from '@/components/editor/ReportUmoEditor.vue'
+import ReportTreeSidebar from '@/components/report/ReportTreeSidebar.vue'
 import { useReportStore } from '@/stores/report'
 
 const route = useRoute()
 const router = useRouter()
-const reportId = Number(route.params.id)
 const store = useReportStore()
-const html = ref('')
 
-const title = computed(() => store.currentReport?.title || store.editingContent?.title || '警情智能报告')
+const reportId = computed(() => Number(route.params.id))
+const html = ref('')
+const sidebarCollapsed = ref(false)
+const selectedFolderId = ref<number | null>(null)
+
+const title = computed(() => store.currentReport?.title || store.editingContent?.title || '未命名报告')
 
 function contentToHtml(content: ReportContent | null) {
-  if (!content) return ''
-  return content.sections.map((s) => `<h2>${escapeHtml(s.title)}</h2><p>${escapeHtml(s.content || '')}</p>`).join('')
+  if (!content) return `<h1 style="text-align:center;">${escapeHtml(title.value)}</h1><p></p>`
+  if (!content.sections?.length) return `<h1 style="text-align:center;">${escapeHtml(content.title || title.value)}</h1><p></p>`
+  return content.sections
+    .map((s) => `<h2>${escapeHtml(s.title)}</h2><p>${escapeHtml(s.content || '')}</p>`)
+    .join('')
 }
 
 function escapeHtml(value: string) {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+async function loadAll() {
+  try {
+    await store.loadReports()
+  } catch {
+    // ignore
+  }
+  try {
+    await store.loadFolders()
+  } catch {
+    // 文件夹接口不可用时仍可编辑报告
+  }
+}
+
+async function loadCurrent() {
+  try {
+    await store.loadReport(reportId.value)
+    selectedFolderId.value = store.currentReport?.folder_id ?? null
+    html.value = store.htmlSnapshot || contentToHtml(store.editingContent)
+    if (!html.value.trim()) {
+      html.value = `<h1 style="text-align:center;">${escapeHtml(title.value)}</h1><p></p>`
+    }
+  } catch {
+    html.value = `<h1 style="text-align:center;">${escapeHtml(title.value)}</h1><p></p>`
+  }
+}
+
+async function createFolder() {
+  const name = window.prompt('请输入文件夹名称', '新建文件夹')
+  if (!name?.trim()) return
+  await store.createFolder(name.trim())
+}
+
+function openReport(report: ReportItem) {
+  if (report.id === reportId.value) return
+  router.push(`/home/editor/${report.id}`)
+}
+
 async function generateDraft() {
-  const result = await store.generateDraft(reportId, 'monthly', {})
+  const result = await store.generateDraft(reportId.value, 'monthly', {})
   html.value = contentToHtml(result.draft_json)
 }
 
 function insertHtml(fragment: string) {
   html.value = `${html.value || ''}${fragment}`
-}
-
-async function confirmDraft() {
-  await store.confirmDraft(reportId)
-  html.value = store.htmlSnapshot || contentToHtml(store.editingContent)
-}
-
-function exportHtml() {
-  window.open(exportReportHtmlUrl(reportId), '_blank')
 }
 
 async function save(value = html.value) {
@@ -49,68 +83,79 @@ async function save(value = html.value) {
     params: {},
     sections: [{ id: 'umo_content', title: '报告正文', type: 'html', content: value, blocks: [], source: [], ai_generated: false }],
   }
-  await store.save(reportId, content, value)
+  await store.save(reportId.value, content, value)
   html.value = value
 }
 
+watch(reportId, async (id) => {
+  if (!Number.isFinite(id) || id <= 0) return
+  await loadCurrent()
+})
+
 onMounted(async () => {
-  await store.loadReport(reportId)
-  html.value = store.htmlSnapshot || contentToHtml(store.editingContent)
+  await loadAll()
+  await loadCurrent()
 })
 </script>
 
 <template>
-  <div class="editor-page workbench-bg">
-    <header class="editor-header">
-      <button class="ghost-btn" @click="router.push('/home/reports')"><ArrowLeft :size="16" /> 返回</button>
-      <div class="editor-title">
-        <h1>{{ title }}</h1>
-        <p>Umo 在线编辑 · AI 草稿需人工确认后保存</p>
-      </div>
-      <div class="editor-actions">
-        <button class="ghost-btn" @click="generateDraft"><Sparkles :size="16" /> AI 草稿</button>
-        <button class="ghost-btn" @click="confirmDraft"><Sparkles :size="16" /> 确认草稿</button>
-        <button class="ghost-btn" @click="exportHtml"><Download :size="16" /> 导出 HTML</button>
-        <button class="primary-btn" @click="save()"><Save :size="16" /> 保存</button>
-      </div>
-    </header>
+  <div class="editor-page">
+    <ReportTreeSidebar
+      v-model:collapsed="sidebarCollapsed"
+      :reports="store.reports"
+      :folders="store.folders"
+      :selected-report-id="reportId"
+      :selected-folder-id="selectedFolderId"
+      @select-folder="selectedFolderId = $event"
+      @open-report="openReport"
+      @create-folder="createFolder"
+      @refresh="loadAll"
+      @templates="router.push('/home/templates')"
+    />
 
-    <div class="editor-body">
-      <aside class="glass-card outline-panel">
-        <div class="panel-title">报告大纲</div>
-        <div v-if="store.editingContent?.sections.length">
-          <button v-for="section in store.editingContent.sections" :key="section.id" class="outline-item">{{ section.title }}</button>
-        </div>
-        <p v-else class="muted empty-tip">暂无大纲，请生成草稿。</p>
-      </aside>
+    <main class="editor-center">
+      <ReportUmoEditor :key="reportId" v-model="html" :title="title" @save="save" />
+    </main>
 
-      <main class="editor-center glass-card">
-        <ReportUmoEditor v-model="html" :title="title" @save="save" />
-      </main>
-
-      <aside class="glass-card ai-panel">
-        <ReportAssistantSidebar @generate-draft="generateDraft" @insert-html="insertHtml" />
-      </aside>
-    </div>
+    <ReportAssistantSidebar
+      @generate-draft="generateDraft"
+      @insert-html="insertHtml"
+    />
   </div>
 </template>
 
 <style scoped>
-.editor-page { min-height: 100vh; padding: 18px; }
-.editor-header { height: 72px; display: flex; align-items: center; gap: 16px; padding: 0 18px; background: rgba(255,255,255,.82); border-radius: 22px; box-shadow: 0 16px 40px rgba(43,83,140,.10); }
-.editor-header button { display: inline-flex; align-items: center; gap: 6px; }
-.editor-title { flex: 1; }
-.editor-title h1 { margin: 0 0 4px; font-size: 20px; }
-.editor-title p { margin: 0; color: #7585a0; font-size: 13px; }
-.editor-actions { display: flex; gap: 10px; }
-.editor-body { display: grid; grid-template-columns: 230px minmax(0, 1fr) 300px; gap: 14px; margin-top: 14px; min-height: calc(100vh - 104px); }
-.outline-panel { padding: 16px; }
-.ai-panel { padding: 0; overflow: hidden; }
-.panel-title { display: flex; align-items: center; gap: 8px; font-weight: 800; margin-bottom: 14px; }
-.outline-item { width: 100%; display: block; border: 0; border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; text-align: left; background: #eef6ff; color: #276bdc; cursor: pointer; }
-.empty-tip { font-size: 13px; }
-.editor-center { overflow: hidden; padding: 0; }
-.ai-panel .hint { padding: 12px; border-radius: 14px; background: #fff8e8; color: #8a6626; font-size: 13px; line-height: 1.7; margin-bottom: 14px; }
-.side-action { width: 100%; border: 0; border-radius: 14px; padding: 12px; margin-bottom: 10px; background: rgba(255,255,255,.78); color: #34506f; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-@media (max-width: 1100px) { .editor-body { grid-template-columns: 1fr; } .outline-panel, .ai-panel { display: none; } }
+.editor-page {
+  height: 100%;
+  display: flex;
+  background: #f0f2f5;
+  min-height: 0;
+}
+
+.editor-center {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 1200px) {
+  .editor-page :deep(.atomic-panel) {
+    width: 280px;
+  }
+}
+
+@media (max-width: 980px) {
+  .editor-page {
+    flex-direction: column;
+  }
+  .editor-page :deep(.sidebar),
+  .editor-page :deep(.atomic-panel) {
+    width: 100%;
+    height: auto;
+    max-height: 240px;
+    border-left: 0;
+    border-right: 0;
+  }
+}
 </style>

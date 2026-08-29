@@ -24,7 +24,7 @@ async function createBlank() {
   try {
     const report = await store.createBlankReport('未命名报告', selectedFolderId.value)
     selectedReportId.value = report.id
-    router.push(`/editor/${report.id}`)
+    router.push(`/home/editor/${report.id}`)
   } catch {
     // API 不可用时仍保留界面交互反馈。
   }
@@ -38,7 +38,7 @@ async function createFolder() {
 
 function openReport(report: ReportItem) {
   selectedReportId.value = report.id
-  router.push(`/editor/${report.id}`)
+  router.push(`/home/editor/${report.id}`)
 }
 
 onMounted(load)

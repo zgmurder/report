@@ -113,6 +113,7 @@ function chooseFolder(id: number) {
 .file-icon { color:#1890ff; margin-top:2px; flex-shrink:0; }
 .file-meta { min-width:0; }
 .file-title { font-size:13px; color:#262626; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.file-row.active .file-title, .file-row:hover .file-title { color:#1890ff; }
 .file-time { margin-top:2px; font-size:11px; color:#8c8c8c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .sidebar-foot { height:48px; border-top:1px solid #f0f0f0; padding:8px; display:flex; align-items:center; gap:6px; flex-shrink:0; }
 .template-btn { flex:1; height:32px; border:0; border-radius:4px; background:#f5f5f5; color:#595959; display:flex; align-items:center; justify-content:center; gap:6px; }
