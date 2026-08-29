@@ -84,6 +84,7 @@ async function submitLogin() {
 
     <section class="login-panel">
       <n-card class="login-card" :bordered="false">
+        <div class="panel-kicker">SECURE ACCESS</div>
         <div class="card-head">
           <div class="security-badge">
             <n-icon :component="ShieldCheck" :size="18" />
@@ -121,12 +122,13 @@ async function submitLogin() {
 .login-page {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) 480px;
+  grid-template-columns: minmax(0, 1.15fr) 500px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 12% 18%, rgba(24, 144, 255, .22), transparent 30%),
-    radial-gradient(circle at 78% 8%, rgba(79, 70, 229, .18), transparent 28%),
-    linear-gradient(135deg, #eef7ff 0%, #f7fbff 44%, #e9f3ff 100%);
+    radial-gradient(circle at 12% 18%, rgba(24, 144, 255, .24), transparent 30%),
+    radial-gradient(circle at 78% 8%, rgba(79, 70, 229, .2), transparent 28%),
+    radial-gradient(circle at 88% 88%, rgba(4, 18, 52, .92), transparent 38%),
+    linear-gradient(135deg, #edf7ff 0%, #f7fbff 42%, #dcecff 100%);
 }
 
 .hero-panel {
@@ -257,20 +259,71 @@ h1 {
 }
 
 .login-panel {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px;
-  background: rgba(255, 255, 255, .42);
-  backdrop-filter: blur(22px);
-  border-left: 1px solid rgba(255, 255, 255, .8);
+  padding: 56px;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(24, 144, 255, .36), transparent 28%),
+    radial-gradient(circle at 85% 78%, rgba(47, 84, 235, .32), transparent 32%),
+    linear-gradient(160deg, #06162f 0%, #0b2143 48%, #071225 100%);
+  overflow: hidden;
+}
+
+.login-panel::before {
+  content: '';
+  position: absolute;
+  inset: 28px;
+  border: 1px solid rgba(146, 199, 255, .18);
+  border-radius: 34px;
+  pointer-events: none;
+}
+
+.login-panel::after {
+  content: '';
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  right: -82px;
+  top: -74px;
+  border-radius: 999px;
+  background: rgba(24, 144, 255, .22);
+  filter: blur(8px);
 }
 
 .login-card {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 396px;
-  border-radius: 28px;
-  box-shadow: 0 30px 80px rgba(16, 44, 84, .16);
+  max-width: 420px;
+  border-radius: 32px;
+  background:
+    linear-gradient(145deg, rgba(18, 42, 78, .82), rgba(9, 21, 45, .88)) !important;
+  border: 1px solid rgba(166, 215, 255, .22);
+  box-shadow:
+    0 36px 90px rgba(0, 10, 28, .46),
+    inset 0 1px 0 rgba(255, 255, 255, .12);
+  backdrop-filter: blur(26px);
+}
+
+.login-card :deep(.n-card__content) {
+  padding: 34px;
+}
+
+.panel-kicker {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  margin-bottom: 22px;
+  border-radius: 999px;
+  color: #9dd3ff;
+  background: rgba(24, 144, 255, .12);
+  border: 1px solid rgba(92, 178, 255, .24);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .16em;
 }
 
 .card-head {
@@ -281,41 +334,71 @@ h1 {
 }
 
 .security-badge {
-  width: 46px;
-  height: 46px;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
-  border-radius: 16px;
+  border-radius: 18px;
   color: #fff;
   background: linear-gradient(135deg, #1890ff, #2f54eb);
-  box-shadow: 0 14px 26px rgba(24, 144, 255, .28);
+  box-shadow: 0 18px 34px rgba(24, 144, 255, .38);
 }
 
 .card-head h3 {
   margin: 0;
-  font-size: 24px;
+  color: #f5fbff;
+  font-size: 28px;
+  letter-spacing: .02em;
 }
 
 .card-head p {
-  margin: 4px 0 0;
-  color: #7a8798;
+  margin: 6px 0 0;
+  color: rgba(218, 237, 255, .68);
 }
 
-.login-btn {
-  height: 46px;
-  margin-top: 4px;
-  border-radius: 12px;
+.login-card :deep(.n-form-item-label__text) {
+  color: rgba(230, 244, 255, .88);
   font-weight: 600;
 }
 
-.tips {
-  margin-top: 20px;
-  padding: 12px 14px;
+.login-card :deep(.n-input) {
+  --n-color: rgba(255, 255, 255, .08) !important;
+  --n-color-focus: rgba(255, 255, 255, .12) !important;
+  --n-border: 1px solid rgba(154, 204, 255, .24) !important;
+  --n-border-hover: 1px solid rgba(104, 190, 255, .54) !important;
+  --n-border-focus: 1px solid rgba(104, 190, 255, .82) !important;
+  --n-box-shadow-focus: 0 0 0 2px rgba(24, 144, 255, .24) !important;
+  --n-text-color: #f7fbff !important;
+  --n-placeholder-color: rgba(215, 232, 255, .42) !important;
+  --n-icon-color: rgba(143, 205, 255, .86) !important;
+  height: 48px;
   border-radius: 14px;
-  background: #f5f9ff;
-  color: #6b7c91;
+}
+
+.login-card :deep(.n-input .n-input__input-el),
+.login-card :deep(.n-input .n-input__textarea-el) {
+  color: #f7fbff;
+}
+
+.login-btn {
+  height: 50px;
+  margin-top: 6px;
+  border-radius: 14px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  background: linear-gradient(135deg, #1890ff, #2f54eb) !important;
+  box-shadow: 0 18px 36px rgba(24, 144, 255, .34);
+}
+
+.tips {
+  margin-top: 22px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(154, 204, 255, .16);
+  color: rgba(224, 240, 255, .68);
   font-size: 12px;
-  line-height: 1.7;
+  line-height: 1.8;
   display: flex;
   flex-direction: column;
 }
@@ -324,6 +407,6 @@ h1 {
   .login-page { grid-template-columns: 1fr; }
   .hero-panel { min-height: 54vh; padding: 36px 24px; }
   .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .login-panel { padding: 24px; border-left: 0; }
+  .login-panel { padding: 24px; }
 }
 </style>
