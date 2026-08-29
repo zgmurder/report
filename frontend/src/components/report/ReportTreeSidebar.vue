@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { NButton, NIcon, NTooltip, NTreeSelect } from 'naive-ui'
-import { BookOpen, FileText, FolderOpen, FolderPlus, PanelLeftClose, RefreshCw, Trash2 } from 'lucide-vue-next'
+import { BookOpen, FileText, FolderOpen, FolderPlus, PanelLeftClose, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 import type { ReportFolderItem, ReportItem } from '@/api/report'
 import { useDepartmentStore } from '@/stores/department'
 
@@ -18,6 +18,7 @@ const emit = defineEmits<{
   'select-folder': [id: number | null]
   'open-report': [report: ReportItem]
   'create-folder': []
+  'rename-folder': [folder: ReportFolderItem]
   'delete-folder': [folder: ReportFolderItem]
   refresh: []
   templates: []
@@ -111,14 +112,24 @@ onMounted(() => {
             <span>{{ folder.name }}</span>
             <em>{{ folder.report_count }}</em>
           </button>
-          <n-tooltip v-if="folder.id !== 0" trigger="hover">
-            <template #trigger>
-              <n-button class="folder-delete" quaternary circle size="tiny" @click.stop="emit('delete-folder', folder)">
-                <template #icon><n-icon :component="Trash2" :size="14" /></template>
-              </n-button>
-            </template>
-            删除目录
-          </n-tooltip>
+          <div v-if="folder.id !== 0" class="folder-actions">
+            <n-tooltip trigger="hover">
+              <template #trigger>
+                <n-button class="folder-action folder-rename" quaternary circle size="tiny" @click.stop="emit('rename-folder', folder)">
+                  <template #icon><n-icon :component="Pencil" :size="14" /></template>
+                </n-button>
+              </template>
+              重命名目录
+            </n-tooltip>
+            <n-tooltip trigger="hover">
+              <template #trigger>
+                <n-button class="folder-action folder-delete" quaternary circle size="tiny" @click.stop="emit('delete-folder', folder)">
+                  <template #icon><n-icon :component="Trash2" :size="14" /></template>
+                </n-button>
+              </template>
+              删除目录
+            </n-tooltip>
+          </div>
         </div>
 
         <div v-show="folderExpanded" class="file-list">
@@ -170,8 +181,10 @@ onMounted(() => {
 .folder-main { flex:1; min-width:0; border:0; background:transparent; padding:8px; display:flex; align-items:center; gap:8px; color:inherit; text-align:left; font-weight:inherit; cursor:pointer; }
 .folder-main span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .folder-main em { color:#8c8c8c; font-style:normal; font-size:12px; }
-.folder-delete { margin-right:4px; opacity:0; color:#8c8c8c; }
-.folder-row:hover .folder-delete { opacity:1; }
+.folder-actions { display:flex; align-items:center; gap:2px; margin-right:4px; opacity:0; }
+.folder-row:hover .folder-actions { opacity:1; }
+.folder-action { color:#8c8c8c; }
+.folder-rename:hover { color:#1890ff; }
 .folder-delete:hover { color:#ff4d4f; }
 .folder-icon { color:#faad14; flex-shrink:0; }
 .file-list { padding-left:8px; }

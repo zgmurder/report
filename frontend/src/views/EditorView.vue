@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NCard, NForm, NFormItem, NInput, NModal, NSpace, useDialog, useMessage } from 'naive-ui'
-import type { ReportContent, ReportItem } from '@/api/report'
+import type { ReportContent, ReportFolderItem, ReportItem } from '@/api/report'
 import ReportAssistantSidebar from '@/components/editor/ReportAssistantSidebar.vue'
 import ReportUmoEditor from '@/components/editor/ReportUmoEditor.vue'
 import ReportTreeSidebar from '@/components/report/ReportTreeSidebar.vue'
@@ -20,9 +20,12 @@ const sidebarCollapsed = ref(false)
 const selectedFolderId = ref<number | null>(null)
 const folderModalVisible = ref(false)
 const folderName = ref('')
-const creatingFolder = ref(false)
+const folderSubmitting = ref(false)
+const editingFolder = ref<ReportFolderItem | null>(null)
 
 const title = computed(() => store.currentReport?.title || store.editingContent?.title || '未命名报告')
+const folderModalTitle = computed(() => editingFolder.value ? '重命名目录' : '新建目录')
+const folderSubmitText = computed(() => editingFolder.value ? '保存' : '创建')
 
 function contentToHtml(content: ReportContent | null) {
   if (!content) return `<h1 style="text-align:center;">${escapeHtml(title.value)}</h1><p></p>`
@@ -63,12 +66,19 @@ async function loadCurrent() {
 }
 
 function createFolder() {
+  editingFolder.value = null
   folderName.value = ''
   folderModalVisible.value = true
 }
 
+function renameFolder(folder: ReportFolderItem) {
+  editingFolder.value = folder
+  folderName.value = folder.name
+  folderModalVisible.value = true
+}
+
 function closeFolderModal() {
-  if (creatingFolder.value) return
+  if (folderSubmitting.value) return
   folderModalVisible.value = false
 }
 
@@ -79,15 +89,20 @@ async function submitFolder() {
     return
   }
   try {
-    creatingFolder.value = true
-    const folder = await store.createFolder(name)
-    selectedFolderId.value = folder.id
+    folderSubmitting.value = true
+    if (editingFolder.value) {
+      await store.renameFolder(editingFolder.value.id, name)
+      message.success('目录已重命名')
+    } else {
+      const folder = await store.createFolder(name)
+      selectedFolderId.value = folder.id
+      message.success('目录已创建')
+    }
     folderModalVisible.value = false
-    message.success('目录已创建')
   } catch {
-    message.error('创建目录失败')
+    message.error(editingFolder.value ? '重命名目录失败' : '创建目录失败')
   } finally {
-    creatingFolder.value = false
+    folderSubmitting.value = false
   }
 }
 
@@ -158,6 +173,7 @@ onMounted(async () => {
       @select-folder="selectedFolderId = $event"
       @open-report="openReport"
       @create-folder="createFolder"
+      @rename-folder="renameFolder"
       @delete-folder="deleteFolder"
       @refresh="loadAll"
       @templates="router.push('/home/templates')"
@@ -172,8 +188,8 @@ onMounted(async () => {
       @insert-html="insertHtml"
     />
 
-    <n-modal v-model:show="folderModalVisible" :mask-closable="!creatingFolder" transform-origin="center">
-      <n-card class="folder-modal" title="新建目录" :bordered="false" role="dialog" aria-modal="true">
+    <n-modal v-model:show="folderModalVisible" :mask-closable="!folderSubmitting" transform-origin="center">
+      <n-card class="folder-modal" :title="folderModalTitle" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="top" @submit.prevent="submitFolder">
           <n-form-item label="目录名称" required>
             <n-input
@@ -189,8 +205,8 @@ onMounted(async () => {
         </n-form>
         <template #footer>
           <n-space justify="end">
-            <n-button :disabled="creatingFolder" @click="closeFolderModal">取消</n-button>
-            <n-button type="primary" :loading="creatingFolder" @click="submitFolder">创建</n-button>
+            <n-button :disabled="folderSubmitting" @click="closeFolderModal">取消</n-button>
+            <n-button type="primary" :loading="folderSubmitting" @click="submitFolder">{{ folderSubmitText }}</n-button>
           </n-space>
         </template>
       </n-card>
