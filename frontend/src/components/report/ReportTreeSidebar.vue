@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { NButton, NIcon, NTooltip, NTreeSelect } from 'naive-ui'
 import { BookOpen, FileText, FolderOpen, FolderPlus, PanelLeftClose, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 import type { ReportFolderItem, ReportItem } from '@/api/report'
@@ -18,8 +18,8 @@ const emit = defineEmits<{
   'select-folder': [id: number | null]
   'open-report': [report: ReportItem]
   'create-folder': []
-  'rename-folder': [folder: ReportFolderItem]
-  'rename-report': [report: ReportItem]
+  'rename-folder': [folder: ReportFolderItem, name: string]
+  'rename-report': [report: ReportItem, title: string]
   'delete-folder': [folder: ReportFolderItem]
   refresh: []
   templates: []
@@ -29,6 +29,9 @@ const departmentStore = useDepartmentStore()
 const folderExpanded = ref(true)
 const dept = ref<string | null>(null)
 const activeTarget = ref<{ type: 'folder'; id: number } | { type: 'report'; id: number } | null>(null)
+const editingTarget = ref<{ type: 'folder'; id: number } | { type: 'report'; id: number } | null>(null)
+const editingName = ref('')
+const editingInputRef = ref<HTMLInputElement | null>(null)
 const deptOptions = computed(() => departmentStore.treeOptions)
 
 const displayReports = computed(() => props.reports)
@@ -53,12 +56,13 @@ function formatTime(value: string) {
 
 function chooseFolder(id: number) {
   const nextId = id === 0 || props.selectedFolderId === id ? null : id
-  activeTarget.value = nextId === null ? null : { type: 'folder', id }
+  activeTarget.value = id === 0 ? null : { type: 'folder', id }
   emit('select-folder', nextId)
   folderExpanded.value = true
 }
 
 function openReport(report: ReportItem) {
+  if (isEditing('report', report.id)) return
   activeTarget.value = { type: 'report', id: report.id }
   emit('open-report', report)
 }
@@ -69,28 +73,74 @@ function isEditableTarget(target: EventTarget | null) {
   return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable || !!target.closest('[contenteditable="true"]')
 }
 
+function isEditing(type: 'folder' | 'report', id: number) {
+  return editingTarget.value?.type === type && editingTarget.value.id === id
+}
+
+async function startRenameFolder(folder: ReportFolderItem) {
+  if (folder.id === 0) return
+  activeTarget.value = { type: 'folder', id: folder.id }
+  editingTarget.value = { type: 'folder', id: folder.id }
+  editingName.value = folder.name
+  await nextTick()
+  editingInputRef.value?.focus()
+  editingInputRef.value?.select()
+}
+
+async function startRenameReport(report: ReportItem) {
+  activeTarget.value = { type: 'report', id: report.id }
+  editingTarget.value = { type: 'report', id: report.id }
+  editingName.value = report.title
+  await nextTick()
+  editingInputRef.value?.focus()
+  editingInputRef.value?.select()
+}
+
 function renameActiveTarget() {
   if (activeTarget.value?.type === 'report') {
     const report = props.reports.find((item) => item.id === activeTarget.value?.id)
     if (report) {
-      emit('rename-report', report)
+      startRenameReport(report)
       return
     }
   }
   if (activeTarget.value?.type === 'folder') {
     const folder = props.folders.find((item) => item.id === activeTarget.value?.id)
     if (folder) {
-      emit('rename-folder', folder)
+      startRenameFolder(folder)
       return
     }
   }
   const selectedReport = props.reports.find((item) => item.id === props.selectedReportId)
   if (selectedReport) {
-    emit('rename-report', selectedReport)
+    startRenameReport(selectedReport)
     return
   }
   const selectedFolder = props.folders.find((item) => item.id === props.selectedFolderId)
-  if (selectedFolder) emit('rename-folder', selectedFolder)
+  if (selectedFolder) startRenameFolder(selectedFolder)
+}
+
+function cancelRename() {
+  editingTarget.value = null
+  editingName.value = ''
+}
+
+function commitRename() {
+  if (!editingTarget.value) return
+  const target = editingTarget.value
+  const name = editingName.value.trim()
+  if (!name) {
+    cancelRename()
+    return
+  }
+  if (target.type === 'folder') {
+    const folder = props.folders.find((item) => item.id === target.id)
+    if (folder && folder.name !== name) emit('rename-folder', folder, name)
+  } else {
+    const report = props.reports.find((item) => item.id === target.id)
+    if (report && report.title !== name) emit('rename-report', report, name)
+  }
+  cancelRename()
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -156,15 +206,26 @@ onBeforeUnmount(() => {
           class="folder-row"
           :class="{ active: selectedFolderId === folder.id }"
         >
-          <button class="folder-main" type="button" @click="chooseFolder(folder.id)">
+          <div class="folder-main" role="button" tabindex="0" @click="chooseFolder(folder.id)" @keydown.enter="chooseFolder(folder.id)">
             <n-icon :component="FolderOpen" :size="16" class="folder-icon" />
-            <span>{{ folder.name }}</span>
+            <input
+              v-if="isEditing('folder', folder.id)"
+              ref="editingInputRef"
+              v-model="editingName"
+              class="inline-rename-input"
+              maxlength="40"
+              @click.stop
+              @keydown.enter.prevent="commitRename"
+              @keydown.esc.prevent="cancelRename"
+              @blur="commitRename"
+            />
+            <span v-else>{{ folder.name }}</span>
             <em>{{ folder.report_count }}</em>
-          </button>
+          </div>
           <div v-if="folder.id !== 0" class="folder-actions">
             <n-tooltip trigger="hover">
               <template #trigger>
-                <n-button class="folder-action folder-rename" quaternary circle size="tiny" @click.stop="emit('rename-folder', folder)">
+                <n-button class="folder-action folder-rename" quaternary circle size="tiny" @click.stop="startRenameFolder(folder)">
                   <template #icon><n-icon :component="Pencil" :size="14" /></template>
                 </n-button>
               </template>
@@ -182,20 +243,33 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-show="folderExpanded" class="file-list">
-          <button
+          <div
             v-for="report in visibleReports"
             :key="report.id"
             class="file-row"
-            type="button"
+            role="button"
+            tabindex="0"
             :class="{ active: selectedReportId === report.id }"
             @click="openReport(report)"
+            @keydown.enter="openReport(report)"
           >
             <n-icon :component="FileText" :size="15" class="file-icon" />
             <div class="file-meta">
-              <div class="file-title">{{ report.title }}</div>
+              <input
+                v-if="isEditing('report', report.id)"
+                ref="editingInputRef"
+                v-model="editingName"
+                class="inline-rename-input report-rename-input"
+                maxlength="80"
+                @click.stop
+                @keydown.enter.prevent="commitRename"
+                @keydown.esc.prevent="cancelRename"
+                @blur="commitRename"
+              />
+              <div v-else class="file-title">{{ report.title }}</div>
               <div class="file-time">最后修改于 {{ formatTime(report.updated_at) }}</div>
             </div>
-          </button>
+          </div>
         </div>
       </div>
 
@@ -228,6 +302,7 @@ onBeforeUnmount(() => {
 .folder-row { width:100%; border-radius:4px; display:flex; align-items:center; color:#262626; font-weight:500; }
 .folder-row:hover,.folder-row.active { background:#f5f5f5; }
 .folder-main { flex:1; min-width:0; border:0; background:transparent; padding:8px; display:flex; align-items:center; gap:8px; color:inherit; text-align:left; font-weight:inherit; cursor:pointer; }
+.folder-main:focus-visible,.file-row:focus-visible { outline:2px solid rgba(24,144,255,.35); outline-offset:-2px; }
 .folder-main span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .folder-main em { color:#8c8c8c; font-style:normal; font-size:12px; }
 .folder-actions { display:flex; align-items:center; gap:2px; margin-right:4px; opacity:0; }
@@ -237,10 +312,12 @@ onBeforeUnmount(() => {
 .folder-delete:hover { color:#ff4d4f; }
 .folder-icon { color:#faad14; flex-shrink:0; }
 .file-list { padding-left:8px; }
-.file-row { width:100%; border:0; background:transparent; border-radius:4px; padding:8px; display:flex; align-items:flex-start; gap:8px; text-align:left; margin-bottom:2px; }
+.file-row { width:100%; border:0; background:transparent; border-radius:4px; padding:8px; display:flex; align-items:flex-start; gap:8px; text-align:left; margin-bottom:2px; cursor:pointer; }
 .file-row:hover,.file-row.active { background:#e6f7ff; }
 .file-icon { color:#1890ff; margin-top:2px; flex-shrink:0; }
-.file-meta { min-width:0; }
+.file-meta { flex:1; min-width:0; }
+.inline-rename-input { flex:1; min-width:0; height:22px; border:1px solid #1890ff; border-radius:3px; padding:0 6px; color:#262626; background:#fff; font:inherit; outline:none; box-shadow:0 0 0 2px rgba(24,144,255,.12); }
+.report-rename-input { width:100%; display:block; font-size:13px; }
 .file-title { font-size:13px; color:#262626; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .file-row.active .file-title, .file-row:hover .file-title { color:#1890ff; }
 .file-time { margin-top:2px; font-size:11px; color:#8c8c8c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

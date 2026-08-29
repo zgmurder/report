@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NCard, NForm, NFormItem, NIcon, NInput, NModal, NSpace, useDialog, useMessage } from 'naive-ui'
 import { FilePlus2 } from 'lucide-vue-next'
@@ -17,13 +17,6 @@ const sidebarCollapsed = ref(false)
 const folderModalVisible = ref(false)
 const folderName = ref('')
 const folderSubmitting = ref(false)
-const editingFolder = ref<ReportFolderItem | null>(null)
-const folderModalTitle = computed(() => editingFolder.value ? '重命名目录' : '新建目录')
-const folderSubmitText = computed(() => editingFolder.value ? '保存' : '创建')
-const reportModalVisible = ref(false)
-const reportName = ref('')
-const reportSubmitting = ref(false)
-const editingReport = ref<ReportItem | null>(null)
 
 async function load() {
   try {
@@ -49,15 +42,17 @@ async function createBlank() {
 }
 
 function createFolder() {
-  editingFolder.value = null
   folderName.value = ''
   folderModalVisible.value = true
 }
 
-function renameFolder(folder: ReportFolderItem) {
-  editingFolder.value = folder
-  folderName.value = folder.name
-  folderModalVisible.value = true
+async function renameFolder(folder: ReportFolderItem, name: string) {
+  try {
+    await store.renameFolder(folder.id, name)
+    message.success('目录已重命名')
+  } catch {
+    message.error('重命名目录失败')
+  }
 }
 
 function closeFolderModal() {
@@ -73,17 +68,12 @@ async function submitFolder() {
   }
   try {
     folderSubmitting.value = true
-    if (editingFolder.value) {
-      await store.renameFolder(editingFolder.value.id, name)
-      message.success('目录已重命名')
-    } else {
-      const folder = await store.createFolder(name)
-      selectedFolderId.value = folder.id
-      message.success('目录已创建')
-    }
+    const folder = await store.createFolder(name)
+    selectedFolderId.value = folder.id
+    message.success('目录已创建')
     folderModalVisible.value = false
   } catch {
-    message.error(editingFolder.value ? '重命名目录失败' : '创建目录失败')
+    message.error('创建目录失败')
   } finally {
     folderSubmitting.value = false
   }
@@ -109,34 +99,13 @@ function deleteFolder(folder: { id: number; name: string; report_count: number }
   })
 }
 
-function renameReport(report: ReportItem) {
-  editingReport.value = report
-  reportName.value = report.title
-  selectedReportId.value = report.id
-  reportModalVisible.value = true
-}
-
-function closeReportModal() {
-  if (reportSubmitting.value) return
-  reportModalVisible.value = false
-}
-
-async function submitReportName() {
-  const name = reportName.value.trim()
-  if (!name) {
-    message.warning('请输入报告名称')
-    return
-  }
-  if (!editingReport.value) return
+async function renameReport(report: ReportItem, title: string) {
   try {
-    reportSubmitting.value = true
-    await store.renameReport(editingReport.value.id, name)
-    reportModalVisible.value = false
+    selectedReportId.value = report.id
+    await store.renameReport(report.id, title)
     message.success('报告已重命名')
   } catch {
     message.error('重命名报告失败')
-  } finally {
-    reportSubmitting.value = false
   }
 }
 
@@ -185,7 +154,7 @@ onMounted(load)
     </section>
 
     <n-modal v-model:show="folderModalVisible" :mask-closable="!folderSubmitting" transform-origin="center">
-      <n-card class="folder-modal" :title="folderModalTitle" :bordered="false" role="dialog" aria-modal="true">
+      <n-card class="folder-modal" title="新建目录" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="top" @submit.prevent="submitFolder">
           <n-form-item label="目录名称" required>
             <n-input
@@ -202,35 +171,12 @@ onMounted(load)
         <template #footer>
           <n-space justify="end">
             <n-button :disabled="folderSubmitting" @click="closeFolderModal">取消</n-button>
-            <n-button type="primary" :loading="folderSubmitting" @click="submitFolder">{{ folderSubmitText }}</n-button>
+            <n-button type="primary" :loading="folderSubmitting" @click="submitFolder">创建</n-button>
           </n-space>
         </template>
       </n-card>
     </n-modal>
 
-    <n-modal v-model:show="reportModalVisible" :mask-closable="!reportSubmitting" transform-origin="center">
-      <n-card class="folder-modal" title="重命名报告" :bordered="false" role="dialog" aria-modal="true">
-        <n-form label-placement="top" @submit.prevent="submitReportName">
-          <n-form-item label="报告名称" required>
-            <n-input
-              v-model:value="reportName"
-              maxlength="80"
-              show-count
-              clearable
-              autofocus
-              placeholder="请输入报告名称"
-              @keyup.enter="submitReportName"
-            />
-          </n-form-item>
-        </n-form>
-        <template #footer>
-          <n-space justify="end">
-            <n-button :disabled="reportSubmitting" @click="closeReportModal">取消</n-button>
-            <n-button type="primary" :loading="reportSubmitting" @click="submitReportName">保存</n-button>
-          </n-space>
-        </template>
-      </n-card>
-    </n-modal>
   </div>
 </template>
 
