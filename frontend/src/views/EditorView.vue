@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Download, PanelRightClose, RefreshCw, Save, Sparkles } from 'lucide-vue-next'
+import { ArrowLeft, Download, Save, Sparkles } from 'lucide-vue-next'
 import type { ReportContent } from '@/api/report'
+import ReportAssistantSidebar from '@/components/editor/ReportAssistantSidebar.vue'
 import ReportUmoEditor from '@/components/editor/ReportUmoEditor.vue'
 import { useReportStore } from '@/stores/report'
 
@@ -26,6 +27,10 @@ function escapeHtml(value: string) {
 async function generateDraft() {
   const result = await store.generateDraft(reportId, 'monthly', {})
   html.value = contentToHtml(result.draft_json)
+}
+
+function insertHtml(fragment: string) {
+  html.value = `${html.value || ''}${fragment}`
 }
 
 async function save(value = html.value) {
@@ -74,12 +79,7 @@ onMounted(async () => {
       </main>
 
       <aside class="glass-card ai-panel">
-        <div class="panel-title"><PanelRightClose :size="16" /> AI / 数据助手</div>
-        <div class="hint">这里放置报告组件、警情数据、AI 润色、敏感表述检查等定制能力。</div>
-        <button class="side-action" @click="generateDraft"><RefreshCw :size="16" /> 重新生成全文</button>
-        <button class="side-action"><Sparkles :size="16" /> 润色选中段落</button>
-        <button class="side-action">插入统计组件</button>
-        <button class="side-action">插入典型警情</button>
+        <ReportAssistantSidebar @generate-draft="generateDraft" @insert-html="insertHtml" />
       </aside>
     </div>
   </div>
@@ -94,7 +94,8 @@ onMounted(async () => {
 .editor-title p { margin: 0; color: #7585a0; font-size: 13px; }
 .editor-actions { display: flex; gap: 10px; }
 .editor-body { display: grid; grid-template-columns: 230px minmax(0, 1fr) 300px; gap: 14px; margin-top: 14px; min-height: calc(100vh - 104px); }
-.outline-panel, .ai-panel { padding: 16px; }
+.outline-panel { padding: 16px; }
+.ai-panel { padding: 0; overflow: hidden; }
 .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 800; margin-bottom: 14px; }
 .outline-item { width: 100%; display: block; border: 0; border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; text-align: left; background: #eef6ff; color: #276bdc; cursor: pointer; }
 .empty-tip { font-size: 13px; }
