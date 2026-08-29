@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NCard, NForm, NFormItem, NInput, NModal, NSpace, useDialog, useMessage } from 'naive-ui'
-import type { ReportContent, ReportFolderItem, ReportItem } from '@/api/report'
+import { downloadReportDocx, type ReportContent, type ReportEditorConfig, type ReportFolderItem, type ReportItem } from '@/api/report'
 import ReportAssistantSidebar from '@/components/editor/ReportAssistantSidebar.vue'
 import ReportUmoEditor from '@/components/editor/ReportUmoEditor.vue'
 import ReportTreeSidebar from '@/components/report/ReportTreeSidebar.vue'
@@ -16,24 +16,83 @@ const dialog = useDialog()
 
 const reportId = computed(() => Number(route.params.id))
 const html = ref('')
+const documentJson = ref<Record<string, unknown> | null>(null)
 const sidebarCollapsed = ref(false)
 const selectedFolderId = ref<number | null>(null)
 const folderModalVisible = ref(false)
 const folderName = ref('')
 const folderSubmitting = ref(false)
+const editorConfig = ref<ReportEditorConfig>(createDefaultEditorConfig())
+const editorVersion = ref(0)
+const editorReady = ref(false)
 
 const title = computed(() => store.currentReport?.title || store.editingContent?.title || '未命名报告')
+
+function isBlankHtml(value: string | null | undefined) {
+  if (!value) return true
+  const normalized = value
+    .replace(/<p><\/p>/gi, '')
+    .replace(/<p><br\s*\/?><\/p>/gi, '')
+    .replace(/<br\s*\/?\s*>/gi, '')
+    .replace(/&nbsp;/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .trim()
+  return normalized.length === 0
+}
+
+function sectionToHtml(section: ReportContent['sections'][number]) {
+  const content = section.content || ''
+  if (section.type === 'html') return content
+  if (content.includes('<') && content.includes('>')) return content
+  return `<h2>${escapeHtml(section.title)}</h2><p>${escapeHtml(content)}</p>`
+}
 
 function contentToHtml(content: ReportContent | null) {
   if (!content) return `<h1 style="text-align:center;">${escapeHtml(title.value)}</h1><p></p>`
   if (!content.sections?.length) return `<h1 style="text-align:center;">${escapeHtml(content.title || title.value)}</h1><p></p>`
-  return content.sections
-    .map((s) => `<h2>${escapeHtml(s.title)}</h2><p>${escapeHtml(s.content || '')}</p>`)
-    .join('')
+
+  const htmlSections = content.sections.map(sectionToHtml).filter((item) => !isBlankHtml(item))
+  if (htmlSections.length) return htmlSections.join('')
+  return `<h1 style="text-align:center;">${escapeHtml(content.title || title.value)}</h1><p></p>`
+}
+
+function resolveEditorHtml(report: ReportItem | null, content: ReportContent | null) {
+  if (!isBlankHtml(report?.html_snapshot)) return report?.html_snapshot || ''
+  return contentToHtml(content)
 }
 
 function escapeHtml(value: string) {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function cloneEditorDocument(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object') return null
+  // Pinia/Vue wraps nested JSON in Proxy objects, which structuredClone cannot clone.
+  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>
+}
+
+function createDefaultEditorConfig(): ReportEditorConfig {
+  return {
+    page: {
+      orientation: 'portrait',
+      margin: { left: 2.54, right: 2.54, top: 2.54, bottom: 2.54 },
+      layout: 'page',
+      background: '#ffffff',
+      size: null,
+    },
+  }
+}
+
+function buildReportContent(value: string, editorDocument = documentJson.value): ReportContent {
+  return {
+    title: title.value,
+    type: 'html',
+    params: {
+      ...(store.editingContent?.params || {}),
+      editor_document: editorDocument,
+    },
+    sections: [{ id: 'umo_content', title: '报告正文', type: 'html', content: value, blocks: [], source: [], ai_generated: false }],
+  }
 }
 
 async function loadAll() {
@@ -45,20 +104,30 @@ async function loadAll() {
   try {
     await store.loadFolders()
   } catch {
-    // 文件夹接口不可用时仍可编辑报告
+    message.warning('目录列表加载失败，请检查后端服务是否已更新并重启')
   }
 }
 
 async function loadCurrent() {
+  editorReady.value = false
   try {
     await store.loadReport(reportId.value)
     selectedFolderId.value = store.currentReport?.folder_id ?? null
-    html.value = store.htmlSnapshot || contentToHtml(store.editingContent)
-    if (!html.value.trim()) {
+    editorConfig.value = store.editorConfig || createDefaultEditorConfig()
+    const savedDocument = store.editingContent?.params?.editor_document
+    documentJson.value = cloneEditorDocument(savedDocument)
+    html.value = resolveEditorHtml(store.currentReport, store.editingContent)
+    if (isBlankHtml(html.value)) {
       html.value = `<h1 style="text-align:center;">${escapeHtml(title.value)}</h1><p></p>`
     }
-  } catch {
-    html.value = `<h1 style="text-align:center;">${escapeHtml(title.value)}</h1><p></p>`
+    editorVersion.value += 1
+    await nextTick()
+    editorReady.value = true
+  } catch (error) {
+    documentJson.value = null
+    html.value = ''
+    editorReady.value = false
+    message.error(error instanceof Error ? `报告内容加载失败：${error.message}` : '报告内容加载失败，请刷新后重试')
   }
 }
 
@@ -171,15 +240,22 @@ function insertHtml(fragment: string) {
   html.value = `${html.value || ''}${fragment}`
 }
 
-async function save(value = html.value) {
-  const content: ReportContent = {
-    title: title.value,
-    type: 'html',
-    params: {},
-    sections: [{ id: 'umo_content', title: '报告正文', type: 'html', content: value, blocks: [], source: [], ai_generated: false }],
-  }
-  await store.save(reportId.value, content, value)
+async function save(value = html.value, config = editorConfig.value, editorDocument = documentJson.value) {
+  editorConfig.value = config
+  documentJson.value = editorDocument
+  const content = buildReportContent(value, editorDocument)
+  await store.save(reportId.value, content, value, config)
   html.value = value
+}
+
+async function exportWord(value: string, config = editorConfig.value, editorDocument = documentJson.value) {
+  try {
+    await save(value, config, editorDocument)
+    await downloadReportDocx(reportId.value, title.value)
+    message.success('Word 文档已导出')
+  } catch {
+    message.error('Word 文档导出失败')
+  }
 }
 
 watch(reportId, async (id) => {
@@ -214,7 +290,17 @@ onMounted(async () => {
     />
 
     <main class="editor-center">
-      <ReportUmoEditor :key="reportId" v-model="html" :title="title" @save="save" />
+      <ReportUmoEditor
+        v-if="editorReady"
+        :key="`${reportId}-${editorVersion}`"
+        v-model="html"
+        v-model:document-json="documentJson"
+        v-model:editor-config="editorConfig"
+        :title="title"
+        :save-handler="save"
+        :export-word-handler="exportWord"
+        @save="save"
+      />
     </main>
 
     <ReportAssistantSidebar
@@ -271,8 +357,8 @@ onMounted(async () => {
 }
 
 @media (max-width: 1200px) {
-  .editor-page :deep(.atomic-panel) {
-    width: 280px;
+  .editor-page :deep(.assistant-panel) {
+    width: 320px;
   }
 }
 
@@ -281,7 +367,7 @@ onMounted(async () => {
     flex-direction: column;
   }
   .editor-page :deep(.sidebar),
-  .editor-page :deep(.atomic-panel) {
+  .editor-page :deep(.assistant-panel) {
     width: 100%;
     height: auto;
     max-height: 240px;

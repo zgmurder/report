@@ -1,348 +1,427 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
+  NAlert,
   NButton,
-  NCheckbox,
-  NCheckboxGroup,
-  NCollapse,
-  NCollapseItem,
+  NDataTable,
+  NDatePicker,
   NEmpty,
   NIcon,
   NSelect,
   NSpace,
-  NTreeSelect,
+  NSpin,
   NTabPane,
   NTabs,
-  NDatePicker,
+  NTag,
+  useMessage,
+  type DataTableColumns,
 } from 'naive-ui'
-import { Filter, RefreshCw, Search, Sparkles } from 'lucide-vue-next'
+import { Bot, Database, FileInput, RefreshCw, Search } from 'lucide-vue-next'
 import { useDepartmentStore } from '@/stores/department'
+import { useUserStore } from '@/stores/user'
+import type { DepartmentItem } from '@/api/department'
+import {
+  executeReportSearch,
+  getReportSearchClassifications,
+  getReportSearchOptions,
+  type SearchClassificationItem,
+  type SearchOptions,
+  type SearchResult,
+} from '@/api/reportSearch'
 
 const emit = defineEmits<{
   generateDraft: []
   insertHtml: [html: string]
-  query: [params: Record<string, unknown>]
 }>()
 
+const message = useMessage()
+const userStore = useUserStore()
 const departmentStore = useDepartmentStore()
-const deptOptions = computed(() => departmentStore.treeOptions)
-const activeMode = ref<'atomic' | 'ai' | 'component'>('atomic')
-const activePreset = ref('本月')
-const timePresets = ['昨天', '今天', '本周', '上周', '本月', '上月', '本年', '去年']
+const activeTab = ref<'search' | 'ai'>('search')
+const loadingOptions = ref(false)
+const querying = ref(false)
+const options = ref<SearchOptions | null>(null)
+const source = ref<'jjd_jjd' | 'fkd_fkd'>('jjd_jjd')
+const range = ref<[number, number] | null>(defaultTimeRange())
+const activeTimePreset = ref('yesterday')
+const categoryCodes = ref<string[]>([])
+const typeCodes = ref<string[]>([])
+const detailCodes = ref<string[]>([])
+const categories = ref<SearchClassificationItem[]>([])
+const types = ref<SearchClassificationItem[]>([])
+const details = ref<SearchClassificationItem[]>([])
+const loadingClassifications = ref(false)
+const result = ref<SearchResult | null>(null)
 
-const range = ref<[number, number] | null>([
-  new Date('2024-04-01 00:00:00').getTime(),
-  new Date('2024-04-02 00:00:00').getTime(),
-])
-const department = ref<string | null>(null)
-const officer = ref<string | null>(null)
+const currentUnitCode = computed(() => {
+  const configured = userStore.user?.unit_code
+  if (configured) return configured
+  return userStore.user?.roles.includes('admin') ? '330782000000' : ''
+})
 
-const selectedDimensions = ref<string[]>(['环比', '同比'])
-const selectedIndicators = ref<string[]>(['累计'])
-const selectedLocations = ref<string[]>(['全市'])
+const currentDepartmentName = computed(() => {
+  const code = currentUnitCode.value
+  if (!code) return '当前账号未配置部门'
+  const findName = (items: DepartmentItem[]): string | null => {
+    for (const item of items) {
+      if (item.code === code) return item.name
+      const childName = item.children?.length ? findName(item.children) : null
+      if (childName) return childName
+    }
+    return null
+  }
+  return findName(departmentStore.departmentTree) || options.value?.current_department.name || (code === '330782000000' ? '义乌市局' : code)
+})
 
-const dimensionOptions = ['环比', '同比', '占比', '排名', '趋势']
-const indicatorOptions = ['累计', '增量', '日均', '峰值', '均值']
-const locationOptions = ['全市', '派出所', '街道', '社区', '重点部位']
+const sourceOptions = computed(() =>
+  (options.value?.data_sources || [{ key: 'jjd_jjd', name: '接警单', enabled: true }]).map((item) => ({ label: item.name, value: item.key, disabled: !item.enabled })),
+)
+const categoryOptions = computed(() => categories.value.map((item) => ({ label: item.name, value: item.code })))
+const typeOptions = computed(() => types.value.map((item) => ({ label: item.name, value: item.code })))
+const detailOptions = computed(() => details.value.map((item) => ({ label: item.name, value: item.code })))
+const tableColumns = computed<DataTableColumns<Record<string, unknown>>>(() =>
+  (result.value?.columns || []).map((column) => ({
+    title: column.label,
+    key: column.key,
+    minWidth: column.type === 'number' ? 96 : 120,
+    ellipsis: { tooltip: true },
+  })),
+)
 
-const officerOptions = [
-  { label: '张三', value: '张三' },
-  { label: '李四', value: '李四' },
+function startOfDay(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function addDays(date: Date, days: number) {
+  const value = new Date(date)
+  value.setDate(value.getDate() + days)
+  return value
+}
+
+function defaultTimeRange(): [number, number] {
+  const today = startOfDay()
+  return [addDays(today, -1).getTime(), today.getTime()]
+}
+
+function lunarNewYear(year: number) {
+  const formatter = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { month: 'numeric', day: 'numeric' })
+  for (let date = new Date(year, 0, 15); date <= new Date(year, 2, 1); date = addDays(date, 1)) {
+    const parts = formatter.formatToParts(date)
+    const month = parts.find((part) => part.type === 'month')?.value
+    const day = parts.find((part) => part.type === 'day')?.value
+    if (month === '1' && day === '1') return startOfDay(date)
+  }
+  return new Date(year, 1, 1)
+}
+
+const timePresets = [
+  { key: 'today', label: '今天' },
+  { key: 'yesterday', label: '昨天' },
+  { key: 'thisWeek', label: '本周' },
+  { key: 'lastWeek', label: '上周' },
+  { key: 'thisMonth', label: '本月' },
+  { key: 'lastMonth', label: '上月' },
+  { key: 'springFestival', label: '春节' },
+  { key: 'mayDay', label: '51节' },
 ]
 
-const componentItems = ['接报总量', '警情类别分布', '高发时段分析', '区域对比表']
+function applyTimePreset(key: string) {
+  const today = startOfDay()
+  const year = today.getFullYear()
+  let start = today
+  let end = addDays(today, 1)
 
-const expandedNames = ref(['params'])
-
-const dateDisplay = computed(() => {
-  if (!range.value) return { start: '', end: '' }
-  const fmt = (ts: number) => {
-    const d = new Date(ts)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  if (key === 'yesterday') {
+    start = addDays(today, -1)
+    end = today
+  } else if (key === 'thisWeek') {
+    const offset = (today.getDay() + 6) % 7
+    start = addDays(today, -offset)
+    end = addDays(start, 7)
+  } else if (key === 'lastWeek') {
+    const offset = (today.getDay() + 6) % 7
+    end = addDays(today, -offset)
+    start = addDays(end, -7)
+  } else if (key === 'thisMonth') {
+    start = new Date(year, today.getMonth(), 1)
+    end = new Date(year, today.getMonth() + 1, 1)
+  } else if (key === 'lastMonth') {
+    start = new Date(year, today.getMonth() - 1, 1)
+    end = new Date(year, today.getMonth(), 1)
+  } else if (key === 'springFestival') {
+    const newYear = lunarNewYear(year)
+    start = addDays(newYear, -1)
+    end = addDays(newYear, 7)
+  } else if (key === 'mayDay') {
+    start = new Date(year, 4, 1)
+    end = new Date(year, 4, 6)
   }
-  return { start: fmt(range.value[0]), end: fmt(range.value[1]) }
+
+  range.value = [start.getTime(), end.getTime()]
+  activeTimePreset.value = key
+  result.value = null
+}
+
+function toTimestamp(value: string) {
+  return new Date(value.replace(' ', 'T')).getTime()
+}
+
+function toLocalDateTime(timestamp: number) {
+  const date = new Date(timestamp)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+async function loadOptions() {
+  loadingOptions.value = true
+  try {
+    options.value = await getReportSearchOptions()
+    range.value = [toTimestamp(options.value.default_start_time), toTimestamp(options.value.default_end_time)]
+    activeTimePreset.value = 'yesterday'
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '搜索配置加载失败')
+  } finally {
+    loadingOptions.value = false
+  }
+}
+
+async function loadCategories() {
+  const response = await getReportSearchClassifications(source.value, 'category')
+  categories.value = response.items
+}
+
+async function loadTypes() {
+  const response = await getReportSearchClassifications(source.value, 'type')
+  types.value = response.items
+}
+
+async function loadDetails() {
+  const response = await getReportSearchClassifications(source.value, 'detail')
+  details.value = response.items
+}
+
+async function loadAllClassifications() {
+  loadingClassifications.value = true
+  try {
+    await Promise.all([loadCategories(), loadTypes(), loadDetails()])
+  } finally {
+    loadingClassifications.value = false
+  }
+}
+
+async function runQuery() {
+  if (!range.value) {
+    message.warning('请选择时间范围')
+    return
+  }
+  querying.value = true
+  try {
+    result.value = await executeReportSearch({
+      source: source.value,
+      start_time: toLocalDateTime(range.value[0]),
+      end_time: toLocalDateTime(range.value[1]),
+      category_codes: categoryCodes.value,
+      type_codes: typeCodes.value,
+      detail_codes: detailCodes.value,
+      dimensions: [],
+      measures: ['event_count'],
+      limit: 100,
+    })
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '查询失败')
+  } finally {
+    querying.value = false
+  }
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function insertResult() {
+  if (!result.value?.rows.length) return
+  const headers = result.value.columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')
+  const rows = result.value.rows.map((row) => `<tr>${result.value!.columns.map((column) => `<td>${escapeHtml(row[column.key])}</td>`).join('')}</tr>`).join('')
+  const [start, end] = range.value || []
+  const timeLabel = start && end ? `${toLocalDateTime(start).replace('T', ' ')} 至 ${toLocalDateTime(end).replace('T', ' ')}` : ''
+  emit('insertHtml', `<h3>${escapeHtml(result.value.source.name)}统计结果</h3><p>统计时间：${escapeHtml(timeLabel)}；统计部门：${escapeHtml(result.value.department.name)}</p><table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table><p></p>`)
+  message.success('查询结果已插入报告')
+}
+
+function resetSearch() {
+  categoryCodes.value = []
+  typeCodes.value = []
+  detailCodes.value = []
+  result.value = null
+  range.value = options.value
+    ? [toTimestamp(options.value.default_start_time), toTimestamp(options.value.default_end_time)]
+    : defaultTimeRange()
+  activeTimePreset.value = 'yesterday'
+}
+
+async function reloadClassificationOptions() {
+  categoryCodes.value = []
+  typeCodes.value = []
+  detailCodes.value = []
+  result.value = null
+  await loadAllClassifications().catch(() => message.error('分类字典加载失败'))
+}
+
+watch(source, async () => {
+  categoryCodes.value = []
+  typeCodes.value = []
+  detailCodes.value = []
+  result.value = null
+  await loadAllClassifications().catch(() => message.error('查询配置加载失败'))
 })
-
-function applyPreset(preset: string) {
-  activePreset.value = preset
-}
-
-function runQuery() {
-  emit('query', {
-    preset: activePreset.value,
-    startDate: dateDisplay.value.start,
-    endDate: dateDisplay.value.end,
-    department: department.value,
-    officer: officer.value,
-    dimensions: [...selectedDimensions.value],
-    indicators: [...selectedIndicators.value],
-    locations: [...selectedLocations.value],
-  })
-}
-
-function resetParams() {
-  activePreset.value = '本月'
-  range.value = [
-    new Date('2024-04-01 00:00:00').getTime(),
-    new Date('2024-04-02 00:00:00').getTime(),
-  ]
-  department.value = null
-  officer.value = null
-  selectedDimensions.value = ['环比', '同比']
-  selectedIndicators.value = ['累计']
-  selectedLocations.value = ['全市']
-}
-
-onMounted(() => {
-  departmentStore.loadDepartmentTree().catch(() => {
-    // 部门接口不可用时保持空态，不影响报告编辑主流程。
-  })
+watch([categoryCodes, typeCodes, detailCodes], () => { result.value = null })
+onMounted(async () => {
+  if (!userStore.user && userStore.token) {
+    await userStore.loadCurrentUser().catch(() => undefined)
+  }
+  if (!departmentStore.departmentTree.length) {
+    await departmentStore.loadDepartmentTree().catch(() => undefined)
+  }
+  await loadOptions()
+  await loadAllClassifications().catch(() => message.error('分类字典加载失败'))
+  window.addEventListener('statistics-dictionary-updated', reloadClassificationOptions)
 })
+onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated', reloadClassificationOptions))
 </script>
 
 <template>
-  <aside class="atomic-panel">
-    <div class="panel-head">
-      <h3>原子输出</h3>
-      <n-space :size="2">
-        <n-button quaternary circle size="small">
-          <template #icon><n-icon :component="Filter" :size="14" /></template>
-        </n-button>
-        <n-button quaternary circle size="small" @click="resetParams">
-          <template #icon><n-icon :component="RefreshCw" :size="14" /></template>
-        </n-button>
-      </n-space>
-    </div>
+  <aside class="assistant-panel">
+    <n-tabs v-model:value="activeTab" type="line" animated class="main-tabs">
+      <n-tab-pane name="search">
+        <template #tab><span class="tab-label"><n-icon :component="Search" />搜索</span></template>
+        <n-spin :show="loadingOptions">
+          <div class="panel-content">
+            <section class="section-card">
+              <div class="section-title">
+                <span>全局参数</span>
+                <n-button quaternary circle size="tiny" title="重置" @click="resetSearch">
+                  <template #icon><n-icon :component="RefreshCw" /></template>
+                </n-button>
+              </div>
+              <div class="field">
+                <div class="field-label">时间范围</div>
+                <n-date-picker v-model:value="range" type="datetimerange" clearable style="width: 100%" @update:value="activeTimePreset = ''" />
+                <div class="time-presets">
+                  <n-button
+                    v-for="preset in timePresets"
+                    :key="preset.key"
+                    size="tiny"
+                    :type="activeTimePreset === preset.key ? 'primary' : 'default'"
+                    :secondary="activeTimePreset === preset.key"
+                    @click="applyTimePreset(preset.key)"
+                  >
+                    {{ preset.label }}
+                  </n-button>
+                </div>
+                <div class="field-hint">时间范围按起始时刻包含、结束时刻不包含统计</div>
+              </div>
+              <div class="field">
+                <div class="field-label">当前账号部门</div>
+                <div class="readonly-value">{{ currentDepartmentName }}</div>
+                <div v-if="currentUnitCode" class="field-hint">{{ currentUnitCode }}</div>
+              </div>
+              <div class="field">
+                <div class="field-label">数据源</div>
+                <n-select v-model:value="source" :options="sourceOptions" />
+                <div class="source-hint"><n-icon :component="Database" />仅查询当前数据库中的受控业务表</div>
+              </div>
+            </section>
 
-    <n-tabs v-model:value="activeMode" type="segment" size="small" class="mode-tabs">
-      <n-tab-pane name="atomic" tab="原子模式" />
-      <n-tab-pane name="ai" tab="AI模式" />
-      <n-tab-pane name="component" tab="组件模式" />
-    </n-tabs>
-
-    <div class="panel-body">
-      <template v-if="activeMode === 'atomic'">
-        <n-collapse v-model:expanded-names="expandedNames">
-          <n-collapse-item title="主要参数" name="params">
-            <div class="preset-row">
-              <n-button
-                v-for="preset in timePresets"
-                :key="preset"
-                size="tiny"
-                :type="activePreset === preset ? 'primary' : 'default'"
-                :secondary="activePreset === preset"
-                @click="applyPreset(preset)"
-              >
-                {{ preset }}
+            <section class="section-card">
+              <div class="section-title"><span>分类筛选</span><n-tag size="small" :bordered="false">各层级独立</n-tag></div>
+              <n-spin :show="loadingClassifications" size="small">
+                <div class="classification-grid">
+                  <div class="field">
+                    <div class="field-label">类别</div>
+                    <n-select v-model:value="categoryCodes" :options="categoryOptions" multiple clearable filterable max-tag-count="responsive" placeholder="全部类别" />
+                  </div>
+                  <div class="field">
+                    <div class="field-label">类型</div>
+                    <n-select v-model:value="typeCodes" :options="typeOptions" multiple clearable filterable virtual-scroll max-tag-count="responsive" placeholder="全部类型" />
+                  </div>
+                  <div class="field">
+                    <div class="field-label">细类</div>
+                    <n-select v-model:value="detailCodes" :options="detailOptions" multiple clearable filterable virtual-scroll max-tag-count="responsive" placeholder="全部细类" />
+                  </div>
+                </div>
+              </n-spin>
+              <n-button type="primary" block :loading="querying" @click="runQuery">
+                <template #icon><n-icon :component="Search" /></template>
+                执行查询
               </n-button>
-            </div>
+            </section>
 
-            <div class="field">
-              <div class="field-label">时间范围</div>
-              <n-date-picker
-                v-model:value="range"
-                type="datetimerange"
-                clearable
-                style="width: 100%"
-              />
-            </div>
-
-            <div class="field-row">
-              <div class="field">
-                <div class="field-label">部门</div>
-                <n-tree-select v-model:value="department" :options="deptOptions" clearable default-expand-all placeholder="请选择" />
+            <section class="result-card">
+              <div class="section-title">
+                <span>查询结果</span>
+                <span v-if="result" class="result-meta">{{ result.row_count }} 行 · {{ result.elapsed_ms }} ms</span>
               </div>
-              <div class="field">
-                <div class="field-label">责任警员</div>
-                <n-select v-model:value="officer" :options="officerOptions" clearable placeholder="请选择" />
+              <n-alert v-if="result?.truncated" type="warning" :show-icon="false" class="result-alert">结果超过 100 行，仅展示前 100 行</n-alert>
+              <div v-if="result?.rows.length" class="result-table">
+                <n-data-table :columns="tableColumns" :data="result.rows" :pagination="false" size="small" :max-height="300" />
+                <n-button secondary type="primary" block class="insert-button" @click="insertResult">
+                  <template #icon><n-icon :component="FileInput" /></template>
+                  插入报告
+                </n-button>
               </div>
-            </div>
-
-            <div class="check-group">
-              <div class="field-label">维度</div>
-              <n-checkbox-group v-model:value="selectedDimensions">
-                <n-space :size="8" style="flex-wrap: wrap">
-                  <n-checkbox v-for="item in dimensionOptions" :key="item" :value="item" :label="item" />
-                </n-space>
-              </n-checkbox-group>
-            </div>
-
-            <div class="check-group">
-              <div class="field-label">指标</div>
-              <n-checkbox-group v-model:value="selectedIndicators">
-                <n-space :size="8" style="flex-wrap: wrap">
-                  <n-checkbox v-for="item in indicatorOptions" :key="item" :value="item" :label="item" />
-                </n-space>
-              </n-checkbox-group>
-            </div>
-
-            <div class="check-group">
-              <div class="field-label">位置</div>
-              <n-checkbox-group v-model:value="selectedLocations">
-                <n-space :size="8" style="flex-wrap: wrap">
-                  <n-checkbox v-for="item in locationOptions" :key="item" :value="item" :label="item" />
-                </n-space>
-              </n-checkbox-group>
-            </div>
-          </n-collapse-item>
-        </n-collapse>
-
-        <div class="operator-block">
-          <div class="operator-title">算子工作清单</div>
-          <p class="operator-tip">从左侧拖入算子到此处，配置数据后可插入报告。</p>
-          <n-button type="primary" block @click="runQuery">
-            <template #icon><n-icon :component="Search" :size="15" /></template>
-            查询生成
-          </n-button>
-          <div class="empty-box">
-            <n-empty description="配置完成后自动生成报告" size="small" />
+              <n-empty v-else description="设置参数并执行查询" size="small" class="result-empty" />
+            </section>
           </div>
+        </n-spin>
+      </n-tab-pane>
+
+      <n-tab-pane name="ai">
+        <template #tab><span class="tab-label"><n-icon :component="Bot" />AI</span></template>
+        <div class="panel-content">
+          <section class="section-card ai-card">
+            <h3>AI 报告助手</h3>
+            <p>基于当前报告内容生成草稿。AI 结果仅作为草稿，需人工核验后使用。</p>
+            <n-space vertical>
+              <n-button type="primary" block @click="emit('generateDraft')">生成全文草稿</n-button>
+              <n-button secondary block @click="emit('insertHtml', '<p>经综合研判，相关警情总体平稳，需持续关注重点区域和高发时段。</p>')">插入研判建议</n-button>
+            </n-space>
+          </section>
         </div>
-      </template>
-
-      <template v-else-if="activeMode === 'ai'">
-        <p class="ai-desc">基于当前报告上下文生成草稿，生成后需人工核对再保存。</p>
-        <n-space vertical :size="10">
-          <n-button type="primary" block @click="emit('generateDraft')">
-            <template #icon><n-icon :component="Sparkles" :size="15" /></template>
-            生成全文草稿
-          </n-button>
-          <n-button secondary block @click="emit('insertHtml', '<p>经综合研判，相关警情总体平稳，需持续关注重点区域和高发时段。</p>')">
-            插入研判建议
-          </n-button>
-          <n-button secondary block @click="emit('insertHtml', '<p>请对以上数据进一步核实，避免直接使用未经确认的 AI 草稿。</p>')">
-            插入核验提示
-          </n-button>
-        </n-space>
-      </template>
-
-      <template v-else>
-        <p class="ai-desc">选择统计组件执行后，可将结果插入正文。</p>
-        <n-space vertical :size="8">
-          <n-button
-            v-for="item in componentItems"
-            :key="item"
-            secondary
-            block
-            style="justify-content: space-between"
-            @click="emit('insertHtml', `<h3>${item}</h3><p>[组件结果占位] ${item}，待接入真实统计结果。</p>`)"
-          >
-            <span>{{ item }}</span>
-            <span class="insert-label">插入</span>
-          </n-button>
-        </n-space>
-      </template>
-    </div>
+      </n-tab-pane>
+    </n-tabs>
   </aside>
 </template>
 
 <style scoped>
-.atomic-panel {
-  width: 320px;
-  flex-shrink: 0;
-  height: 100%;
-  background: #fff;
-  border-left: 1px solid #e8e8e8;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.panel-head {
-  height: 44px;
-  padding: 0 12px 0 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #f0f0f0;
-  flex-shrink: 0;
-}
-
-.panel-head h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: #262626;
-}
-
-.mode-tabs {
-  padding: 8px 10px 0;
-  flex-shrink: 0;
-}
-
-.panel-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 10px 12px 16px;
-}
-
-.preset-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.field {
-  margin-bottom: 12px;
-}
-
-.field-label {
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: #8c8c8c;
-}
-
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.check-group {
-  margin-bottom: 12px;
-}
-
-.operator-block {
-  margin-top: 12px;
-}
-
-.operator-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #262626;
-  margin-bottom: 6px;
-}
-
-.operator-tip {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: #8c8c8c;
-  line-height: 1.6;
-}
-
-.empty-box {
-  margin-top: 12px;
-  min-height: 140px;
-  border: 1px dashed #d9d9d9;
-  border-radius: 6px;
-  background: #fafafa;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-}
-
-.ai-desc {
-  margin: 0 0 12px;
-  font-size: 12px;
-  color: #8c8c8c;
-  line-height: 1.6;
-}
-
-.insert-label {
-  color: #1890ff;
-  font-size: 12px;
-}
+.assistant-panel { width: 360px; flex-shrink: 0; height: 100%; background: #f7f8fa; border-left: 1px solid #e5e7eb; display: flex; min-height: 0; }
+.main-tabs { width: 100%; display: flex; flex-direction: column; min-height: 0; }
+.main-tabs :deep(.n-tabs-nav) { flex-shrink: 0; padding: 0 16px; background: #fff; }
+.main-tabs :deep(.n-tabs-tab) { width: 50%; justify-content: center; padding: 13px 0; font-weight: 600; }
+.main-tabs :deep(.n-tabs-pane-wrapper), .main-tabs :deep(.n-tab-pane) { flex: 1; min-height: 0; }
+.main-tabs :deep(.n-tab-pane) { height: 100%; overflow: auto; }
+.tab-label { display: inline-flex; gap: 6px; align-items: center; }
+.panel-content { padding: 12px; }
+.section-card, .result-card { background: #fff; border: 1px solid #e8eaee; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+.section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; color: #262626; font-size: 14px; font-weight: 600; }
+.field { margin-bottom: 13px; }
+.field:last-child { margin-bottom: 0; }
+.field-label { margin-bottom: 6px; font-size: 12px; color: #606266; font-weight: 500; }
+.field-hint { margin-top: 4px; color: #a0a4aa; font-size: 11px; }
+.time-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.time-presets :deep(.n-button) { padding: 0 4px; }
+.readonly-value { height: 34px; padding: 0 10px; display: flex; align-items: center; background: #f5f7fa; border: 1px solid #e4e7ed; border-radius: 4px; color: #303133; }
+.source-hint { display: flex; align-items: center; gap: 4px; margin-top: 6px; color: #909399; font-size: 11px; }
+.classification-grid { display: grid; grid-template-columns: 1fr; }
+.classification-grid .field { margin-bottom: 10px; }
+.section-divider { height: 1px; margin: 3px 0 12px; background: #eef0f3; }
+.sub-title { margin-bottom: 10px; }
+.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 6px; }
+.result-meta { color: #909399; font-size: 11px; font-weight: 400; }
+.result-alert { margin-bottom: 8px; font-size: 11px; }
+.result-table { min-width: 0; }
+.insert-button { margin-top: 10px; }
+.result-empty { padding: 28px 0 34px; }
+.ai-card h3 { margin: 0 0 8px; font-size: 15px; }
+.ai-card p { margin: 0 0 14px; color: #7a7f87; font-size: 12px; line-height: 1.7; }
+@media (max-width: 1200px) { .assistant-panel { width: 320px; } }
 </style>

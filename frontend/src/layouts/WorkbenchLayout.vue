@@ -1,15 +1,22 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, h, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NAvatar, NButton, NDropdown, NIcon } from 'naive-ui'
-import { History, UserRound } from 'lucide-vue-next'
+import { BookOpenCheck, History, LogOut, UserRound } from 'lucide-vue-next'
 import { workbenchNavItems } from '@/data/navigation'
 import { useUserStore } from '@/stores/user'
+import StatisticsDictionaryConfigModal from '@/components/system/StatisticsDictionaryConfigModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const userOptions = computed(() => [{ label: '退出登录', key: 'logout' }])
+const showDictionaryConfig = ref(false)
+const userOptions = computed(() => [
+  ...(userStore.user?.roles.includes('admin')
+    ? [{ label: '字典配置', key: 'dictionary-config', icon: () => h(NIcon, null, { default: () => h(BookOpenCheck) }) }]
+    : []),
+  { label: '退出登录', key: 'logout', icon: () => h(NIcon, null, { default: () => h(LogOut) }) },
+])
 
 function isActive(path: string) {
   if (path === '/home/reports') {
@@ -19,6 +26,10 @@ function isActive(path: string) {
 }
 
 function handleUserAction(key: string) {
+  if (key === 'dictionary-config') {
+    showDictionaryConfig.value = true
+    return
+  }
   if (key === 'logout') {
     userStore.logout()
     router.replace('/login')
@@ -72,6 +83,8 @@ function handleUserAction(key: string) {
     <main class="app-main">
       <router-view />
     </main>
+
+    <statistics-dictionary-config-modal v-model:show="showDictionaryConfig" />
   </div>
 </template>
 

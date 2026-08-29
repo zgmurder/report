@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toRaw } from 'vue'
 import {
   confirmReportDraft,
   createReport,
@@ -13,6 +14,7 @@ import {
   updateReport,
   updateReportFolder,
   type ReportContent,
+  type ReportEditorConfig,
   type ReportFolderItem,
   type ReportItem,
 } from '@/api/report'
@@ -24,6 +26,7 @@ export const useReportStore = defineStore('report', {
     currentReport: null as ReportItem | null,
     editingContent: null as ReportContent | null,
     htmlSnapshot: '',
+    editorConfig: null as ReportEditorConfig | null,
   }),
   actions: {
     async loadReports() {
@@ -73,13 +76,15 @@ export const useReportStore = defineStore('report', {
         this.currentReport = null
         this.editingContent = null
         this.htmlSnapshot = ''
+        this.editorConfig = null
       }
     },
     async loadReport(id: number) {
       this.currentReport = await getReport(id)
       const content = this.currentReport.content_json || this.currentReport.draft_json
-      this.editingContent = content ? structuredClone(content) : null
+      this.editingContent = content ? structuredClone(toRaw(content)) : null
       this.htmlSnapshot = this.currentReport.html_snapshot || ''
+      this.editorConfig = this.currentReport.editor_config ? structuredClone(toRaw(this.currentReport.editor_config)) : null
     },
     async generateDraft(id: number, reportType = 'monthly', sourceQuery: Record<string, unknown> = {}) {
       const result = await generateReportDraft(id, { report_type: reportType, source_query: sourceQuery })
@@ -93,12 +98,13 @@ export const useReportStore = defineStore('report', {
       await this.loadReports()
       return report
     },
-    async save(id: number, content?: ReportContent, htmlSnapshot?: string) {
+    async save(id: number, content: ReportContent | undefined, htmlSnapshot: string | undefined, editorConfig: ReportEditorConfig) {
       const target = content || this.editingContent
       if (!target) return
-      this.currentReport = await saveReportContent(id, target, htmlSnapshot ?? this.htmlSnapshot)
+      this.currentReport = await saveReportContent(id, target, htmlSnapshot ?? this.htmlSnapshot, editorConfig)
       this.editingContent = this.currentReport.content_json || target
       this.htmlSnapshot = this.currentReport.html_snapshot || htmlSnapshot || ''
+      this.editorConfig = this.currentReport.editor_config || editorConfig
       await this.loadReports()
     },
   },

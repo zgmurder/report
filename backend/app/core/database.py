@@ -28,7 +28,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     if engine.dialect.name == "mysql":
         with engine.begin() as conn:
-            for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs", "departments", "sys_users"):
+            for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs", "departments", "sys_users", "statistics_dictionary_exclusions"):
                 conn.execute(text(f"ALTER TABLE {table_name} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
             has_folder_id = conn.execute(
                 text(
@@ -38,6 +38,14 @@ def init_db() -> None:
             ).scalar()
             if not has_folder_id:
                 conn.execute(text("ALTER TABLE report_documents ADD COLUMN folder_id INT NULL AFTER report_type"))
+            has_editor_config = conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'report_documents' AND COLUMN_NAME = 'editor_config'"
+                )
+            ).scalar()
+            if not has_editor_config:
+                conn.execute(text("ALTER TABLE report_documents ADD COLUMN editor_config JSON NULL AFTER source_query"))
 
     from app.repositories.user_repository import UserRepository
 

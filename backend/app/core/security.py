@@ -9,8 +9,11 @@ from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.database import get_db
 
 settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_prefix}/auth/login", auto_error=False)
@@ -60,7 +63,7 @@ def create_access_token(user: CurrentUser) -> str:
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def get_current_user(token: str | None = Depends(oauth2_scheme)) -> CurrentUser:
+def get_current_user(token: str | None = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> CurrentUser:
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未登录或登录已过期")
     try:
@@ -73,10 +76,24 @@ def get_current_user(token: str | None = Depends(oauth2_scheme)) -> CurrentUser:
     if not username or not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的登录凭证")
 
+    row = db.execute(
+        text(
+            """
+            SELECT id, username, display_name, roles, unit_code, status
+            FROM sys_users
+            WHERE id = :user_id AND username = :username
+            LIMIT 1
+            """
+        ),
+        {"user_id": int(user_id), "username": str(username)},
+    ).mappings().first()
+    if not row or row["status"] != "enabled":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在或已停用")
+
     return CurrentUser(
-        id=int(user_id),
-        username=str(username),
-        display_name=str(payload.get("display_name") or username),
-        roles=list(payload.get("roles") or []),
-        unit_code=payload.get("unit_code"),
+        id=int(row["id"]),
+        username=str(row["username"]),
+        display_name=str(row["display_name"] or row["username"]),
+        roles=[item.strip() for item in str(row["roles"] or "user").split(",") if item.strip()],
+        unit_code=row["unit_code"],
     )

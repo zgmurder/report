@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.models.report import ReportDocument, ReportFolder
-from app.schemas.report import ReportContent, ReportCreateRequest, ReportDetail, ReportFolderItem, ReportItem
+from app.schemas.report import ReportContent, ReportCreateRequest, ReportDetail, ReportEditorConfig, ReportFolderItem, ReportItem
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -137,7 +137,13 @@ class ReportRepository:
         self.db.refresh(row)
         return self._to_detail(row)
 
-    def save_content(self, report_id: int, content: ReportContent, html_snapshot: str | None = None) -> ReportDetail | None:
+    def save_content(
+        self,
+        report_id: int,
+        content: ReportContent,
+        html_snapshot: str | None = None,
+        editor_config: ReportEditorConfig | None = None,
+    ) -> ReportDetail | None:
         row = self.db.get(ReportDocument, report_id)
         if not row:
             return None
@@ -145,6 +151,8 @@ class ReportRepository:
         row.report_type = content.type or row.report_type
         row.content_json = content.model_dump(mode="json")
         row.html_snapshot = html_snapshot
+        if editor_config is not None:
+            row.editor_config = editor_config.model_dump(mode="json")
         row.status = "confirmed"
         self.db.commit()
         self.db.refresh(row)
@@ -172,9 +180,15 @@ class ReportRepository:
 
     def _to_detail(self, row: ReportDocument) -> ReportDetail:
         item = self._to_item(row)
+        legacy_editor_config = {}
+        if not row.editor_config and isinstance(row.content_json, dict):
+            params = row.content_json.get("params")
+            if isinstance(params, dict) and isinstance(params.get("editor"), dict):
+                legacy_editor_config = params["editor"]
         return ReportDetail(
             **item.model_dump(),
             source_query=row.source_query or {},
+            editor_config=ReportEditorConfig.model_validate(row.editor_config or legacy_editor_config),
             content_json=ReportContent.model_validate(row.content_json) if row.content_json else None,
             draft_json=ReportContent.model_validate(row.draft_json) if row.draft_json else None,
             html_snapshot=row.html_snapshot,

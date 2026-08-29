@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
@@ -77,6 +79,17 @@ def confirm_report(report_id: int, service: ReportService = Depends(get_service)
 @router.get("/{report_id}/export-html")
 def export_report_html(report_id: int, service: ReportService = Depends(get_service)):
     return Response(content=service.export_html(report_id), media_type="text/html; charset=utf-8")
+
+
+@router.get("/{report_id}/export-docx")
+def export_report_docx(report_id: int, service: ReportService = Depends(get_service)):
+    title, content = service.export_docx(report_id)
+    filename = quote(f"{title}.docx")
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+    )
 
 
 @router.put("/{report_id}/content")

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -20,6 +20,21 @@ class User(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="enabled", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=local_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=local_now, onupdate=local_now)
+
+
+class StatisticsDictionaryExclusion(Base):
+    __tablename__ = "statistics_dictionary_exclusions"
+    __table_args__ = (
+        UniqueConstraint("source", "level", "code", name="uq_statistics_dictionary_exclusion"),
+        {"mysql_charset": "utf8mb4", "mysql_collate": "utf8mb4_unicode_ci"},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    level: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=local_now)
 
 
 class Department(Base):

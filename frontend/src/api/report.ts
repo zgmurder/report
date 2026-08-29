@@ -10,6 +10,32 @@ export interface ReportSection {
   ai_generated: boolean
 }
 
+export interface EditorPageMargin {
+  left: number
+  right: number
+  top: number
+  bottom: number
+  layout?: string
+}
+
+export interface EditorPageSize {
+  label?: string | Record<string, string> | null
+  width?: number | null
+  height?: number | null
+}
+
+export interface EditorPageConfig {
+  orientation: 'portrait' | 'landscape'
+  margin: EditorPageMargin
+  layout: 'page' | 'web'
+  background: string
+  size?: EditorPageSize | null
+}
+
+export interface ReportEditorConfig {
+  page: EditorPageConfig
+}
+
 export interface ReportContent {
   title: string
   type: string
@@ -26,6 +52,7 @@ export interface ReportItem {
   created_at: string
   updated_at: string
   source_query?: Record<string, unknown>
+  editor_config?: ReportEditorConfig
   content_json?: ReportContent | null
   draft_json?: ReportContent | null
   html_snapshot?: string | null
@@ -85,10 +112,27 @@ export function exportReportHtmlUrl(id: number) {
   return `/api/v1/reports/${id}/export-html`
 }
 
+export async function downloadReportDocx(id: number, title: string) {
+  const token = localStorage.getItem('report_access_token')
+  const response = await fetch(`/api/v1/reports/${id}/export-docx`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) throw new Error('Word 导出失败')
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${title || '报告'}.docx`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 export function generateReportDraft(id: number, data: { report_type: string; source_query: Record<string, unknown> }) {
   return apiPost<{ draft_json: ReportContent; explanation: string; warnings: string[] }>(`/reports/${id}/generate-draft`, data)
 }
 
-export function saveReportContent(id: number, content_json: ReportContent, html_snapshot?: string) {
-  return apiPut<ReportItem>(`/reports/${id}/content`, { content_json, html_snapshot })
+export function saveReportContent(id: number, content_json: ReportContent, html_snapshot: string | undefined, editor_config: ReportEditorConfig) {
+  return apiPut<ReportItem>(`/reports/${id}/content`, { content_json, html_snapshot, editor_config })
 }

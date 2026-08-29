@@ -6,6 +6,33 @@ from pydantic import BaseModel, Field, field_serializer
 from app.core.timeutil import to_iso_cn
 
 ReportStatus = Literal["draft", "confirmed", "archived"]
+PageOrientation = Literal["portrait", "landscape"]
+PageLayout = Literal["page", "web"]
+
+
+class EditorPageMargin(BaseModel):
+    left: float = Field(default=2.54, ge=0, le=20)
+    right: float = Field(default=2.54, ge=0, le=20)
+    top: float = Field(default=2.54, ge=0, le=20)
+    bottom: float = Field(default=2.54, ge=0, le=20)
+
+
+class EditorPageSize(BaseModel):
+    label: str | dict[str, str] | None = None
+    width: float | None = Field(default=None, gt=0, le=100)
+    height: float | None = Field(default=None, gt=0, le=100)
+
+
+class EditorPageConfig(BaseModel):
+    orientation: PageOrientation = "portrait"
+    margin: EditorPageMargin = Field(default_factory=EditorPageMargin)
+    layout: PageLayout = "page"
+    background: str = Field(default="#ffffff", max_length=50)
+    size: EditorPageSize | None = None
+
+
+class ReportEditorConfig(BaseModel):
+    page: EditorPageConfig = Field(default_factory=EditorPageConfig)
 
 
 class ReportSection(BaseModel):
@@ -41,6 +68,7 @@ class ReportUpdateRequest(BaseModel):
 class ReportSaveRequest(BaseModel):
     content_json: ReportContent
     html_snapshot: str | None = None
+    editor_config: ReportEditorConfig = Field(default_factory=ReportEditorConfig)
 
 
 class ReportGenerateRequest(BaseModel):
@@ -64,6 +92,7 @@ class ReportItem(BaseModel):
 
 class ReportDetail(ReportItem):
     source_query: dict[str, Any] = Field(default_factory=dict)
+    editor_config: ReportEditorConfig = Field(default_factory=ReportEditorConfig)
     content_json: ReportContent | None = None
     draft_json: ReportContent | None = None
     html_snapshot: str | None = None

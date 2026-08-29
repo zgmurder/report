@@ -99,9 +99,18 @@ class ReportService:
         report = self.get(report_id)
         return self.export_service.render_report_html(report)
 
+    def export_docx(self, report_id: int) -> tuple[str, bytes]:
+        report = self.get(report_id)
+        return report.title, self.export_service.render_report_docx(report)
+
     def save(self, report_id: int, req: ReportSaveRequest) -> ReportDetail:
         content = self._validate_content(req.content_json)
-        report = self.repository.save_content(report_id, content, html_snapshot=req.html_snapshot)
+        report = self.repository.save_content(
+            report_id,
+            content,
+            html_snapshot=req.html_snapshot,
+            editor_config=req.editor_config,
+        )
         if not report:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="报告不存在")
         return report

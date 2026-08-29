@@ -30,6 +30,7 @@ class ReportDocument(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
     folder_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_query: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    editor_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     content_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     draft_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     html_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)

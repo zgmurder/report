@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { NButton, NIcon, NTooltip, NTreeSelect } from 'naive-ui'
-import { BookOpen, FilePlus2, FileText, FolderOpen, FolderPlus, PanelLeftClose, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
+import { BookOpen, ChevronDown, ChevronRight, FilePlus2, FileText, FolderOpen, FolderPlus, PanelLeftClose, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 import type { ReportFolderItem, ReportItem } from '@/api/report'
 import { useDepartmentStore } from '@/stores/department'
 import { formatDateTime } from '@/utils/datetime'
@@ -29,7 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const departmentStore = useDepartmentStore()
-const folderExpanded = ref(true)
+const expandedFolderIds = ref<Set<number>>(new Set())
 const dept = ref<string | null>(null)
 const activeTarget = ref<{ type: 'folder'; id: number } | { type: 'report'; id: number } | null>(null)
 const editingTarget = ref<{ type: 'folder'; id: number } | { type: 'report'; id: number } | null>(null)
@@ -40,10 +40,22 @@ const deptOptions = computed(() => departmentStore.treeOptions)
 const displayReports = computed(() => props.reports)
 const reportCount = computed(() => displayReports.value.length)
 const visibleFolders = computed(() => props.folders)
-const visibleReports = computed(() => {
-  if (props.selectedFolderId === null) return displayReports.value
-  return displayReports.value.filter((report) => Number(report.folder_id) === Number(props.selectedFolderId))
-})
+const rootReports = computed(() => displayReports.value.filter((report) => report.folder_id == null))
+
+function reportsInFolder(folderId: number) {
+  return displayReports.value.filter((report) => Number(report.folder_id) === Number(folderId))
+}
+
+function isFolderExpanded(folderId: number) {
+  return expandedFolderIds.value.has(folderId)
+}
+
+function toggleFolder(folderId: number) {
+  const next = new Set(expandedFolderIds.value)
+  if (next.has(folderId)) next.delete(folderId)
+  else next.add(folderId)
+  expandedFolderIds.value = next
+}
 
 function folderReportCount(folder: ReportFolderItem) {
   return displayReports.value.filter((report) => Number(report.folder_id) === Number(folder.id)).length
@@ -56,7 +68,7 @@ function canDeleteFolder(folder: ReportFolderItem) {
 function chooseFolder(id: number) {
   activeTarget.value = { type: 'folder', id }
   emit('select-folder', id)
-  folderExpanded.value = true
+  toggleFolder(id)
 }
 
 function openReport(report: ReportItem) {
@@ -120,6 +132,15 @@ function createReportInFolder(folder: ReportFolderItem) {
 }
 
 watch(
+  () => props.folders,
+  (folders) => {
+    if (expandedFolderIds.value.size || !folders.length) return
+    expandedFolderIds.value = new Set(folders.map((folder) => folder.id))
+  },
+  { immediate: true },
+)
+
+watch(
   () => departmentStore.departmentTree,
   (departments) => {
     if (!dept.value && departments.length) dept.value = departments[0].code
@@ -171,10 +192,14 @@ onMounted(() => {
         <div
           v-for="folder in visibleFolders"
           :key="folder.id"
-          class="folder-row"
-          :class="{ active: selectedFolderId === folder.id || (activeTarget?.type === 'folder' && activeTarget.id === folder.id) }"
+          class="folder-group"
         >
-          <div class="folder-main" role="button" tabindex="0" @click="chooseFolder(folder.id)" @keydown.enter="chooseFolder(folder.id)">
+          <div
+            class="folder-row"
+            :class="{ active: selectedFolderId === folder.id || (activeTarget?.type === 'folder' && activeTarget.id === folder.id) }"
+          >
+            <div class="folder-main" role="button" tabindex="0" @click="chooseFolder(folder.id)" @keydown.enter="chooseFolder(folder.id)">
+            <n-icon :component="isFolderExpanded(folder.id) ? ChevronDown : ChevronRight" :size="14" class="folder-chevron" />
             <n-icon :component="FolderOpen" :size="16" class="folder-icon" />
             <input
               v-if="isEditing('folder', folder.id)"
@@ -188,9 +213,9 @@ onMounted(() => {
               @blur="commitRename"
             />
             <span v-else>{{ folder.name }}</span>
-            <em>{{ folderReportCount(folder) }}</em>
-          </div>
-          <div class="row-actions">
+              <em>{{ folderReportCount(folder) }}</em>
+            </div>
+            <div class="row-actions">
             <n-tooltip trigger="hover">
               <template #trigger>
                 <n-button class="row-action row-create" quaternary circle size="tiny" @click.stop="createReportInFolder(folder)">
@@ -215,12 +240,62 @@ onMounted(() => {
               </template>
               删除目录
             </n-tooltip>
+            </div>
+          </div>
+
+          <div v-show="isFolderExpanded(folder.id)" class="file-list">
+            <div
+              v-for="report in reportsInFolder(folder.id)"
+              :key="report.id"
+              class="file-row"
+              role="button"
+              tabindex="0"
+              :class="{ active: selectedReportId === report.id || (activeTarget?.type === 'report' && activeTarget.id === report.id) }"
+              @click="openReport(report)"
+              @keydown.enter="openReport(report)"
+            >
+              <n-icon :component="FileText" :size="15" class="file-icon" />
+              <div class="file-meta">
+                <input
+                  v-if="isEditing('report', report.id)"
+                  :ref="setEditingInputRef"
+                  v-model="editingName"
+                  class="inline-rename-input report-rename-input"
+                  maxlength="80"
+                  @click.stop
+                  @keydown.enter.prevent="commitRename"
+                  @keydown.esc.prevent="cancelRename"
+                  @blur="commitRename"
+                />
+                <div v-else class="file-title">{{ report.title }}</div>
+                <div class="file-time">最后修改于 {{ formatDateTime(report.updated_at) }}</div>
+              </div>
+              <div class="row-actions report-actions">
+                <n-tooltip trigger="hover">
+                  <template #trigger>
+                    <n-button class="row-action row-rename" quaternary circle size="tiny" @click.stop="startRenameReport(report)">
+                      <template #icon><n-icon :component="Pencil" :size="14" /></template>
+                    </n-button>
+                  </template>
+                  重命名报告
+                </n-tooltip>
+                <n-tooltip trigger="hover">
+                  <template #trigger>
+                    <n-button class="row-action row-delete" quaternary circle size="tiny" @click.stop="emit('delete-report', report)">
+                      <template #icon><n-icon :component="Trash2" :size="14" /></template>
+                    </n-button>
+                  </template>
+                  删除报告
+                </n-tooltip>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div v-show="folderExpanded" class="file-list">
+        <div v-if="rootReports.length" class="root-report-group">
+          <div class="root-report-title">未归档报告</div>
           <div
-            v-for="report in visibleReports"
+            v-for="report in rootReports"
             :key="report.id"
             class="file-row"
             role="button"
@@ -231,37 +306,8 @@ onMounted(() => {
           >
             <n-icon :component="FileText" :size="15" class="file-icon" />
             <div class="file-meta">
-              <input
-                v-if="isEditing('report', report.id)"
-                :ref="setEditingInputRef"
-                v-model="editingName"
-                class="inline-rename-input report-rename-input"
-                maxlength="80"
-                @click.stop
-                @keydown.enter.prevent="commitRename"
-                @keydown.esc.prevent="cancelRename"
-                @blur="commitRename"
-              />
-              <div v-else class="file-title">{{ report.title }}</div>
+              <div class="file-title">{{ report.title }}</div>
               <div class="file-time">最后修改于 {{ formatDateTime(report.updated_at) }}</div>
-            </div>
-            <div class="row-actions report-actions">
-              <n-tooltip trigger="hover">
-                <template #trigger>
-                  <n-button class="row-action row-rename" quaternary circle size="tiny" @click.stop="startRenameReport(report)">
-                    <template #icon><n-icon :component="Pencil" :size="14" /></template>
-                  </n-button>
-                </template>
-                重命名报告
-              </n-tooltip>
-              <n-tooltip trigger="hover">
-                <template #trigger>
-                  <n-button class="row-action row-delete" quaternary circle size="tiny" @click.stop="emit('delete-report', report)">
-                    <template #icon><n-icon :component="Trash2" :size="14" /></template>
-                  </n-button>
-                </template>
-                删除报告
-              </n-tooltip>
             </div>
           </div>
         </div>
@@ -295,6 +341,7 @@ onMounted(() => {
 .dept-wrap { padding:0 12px 12px; }
 .tree { flex:1; min-height:0; overflow:auto; padding:0 8px 12px; }
 .tree-empty { padding:16px 8px; font-size:12px; color:#8c8c8c; text-align:center; }
+.folder-group { width:100%; }
 .folder-row { width:100%; border-radius:4px; display:flex; align-items:center; color:#262626; font-weight:500; }
 .folder-row:hover,.folder-row.active { background:#f5f5f5; }
 .folder-main { flex:1; min-width:0; border:0; background:transparent; padding:8px; display:flex; align-items:center; gap:8px; color:inherit; text-align:left; font-weight:inherit; cursor:pointer; }
@@ -309,8 +356,11 @@ onMounted(() => {
 .row-action { color:#8c8c8c; }
 .row-create:hover,.row-rename:hover { color:#1890ff; }
 .row-delete:hover { color:#ff4d4f; }
+.folder-chevron { color:#8c8c8c; flex-shrink:0; transition:transform .15s ease; }
 .folder-icon { color:#faad14; flex-shrink:0; }
-.file-list { padding-left:8px; }
+.file-list { padding-left:22px; }
+.root-report-group { margin-top:6px; }
+.root-report-title { padding:7px 8px; color:#8c8c8c; font-size:12px; }
 .file-row { width:100%; border:0; background:transparent; border-radius:4px; padding:8px 4px 8px 8px; display:flex; align-items:flex-start; gap:8px; text-align:left; margin-bottom:2px; cursor:pointer; }
 .file-row:hover,.file-row.active { background:#e6f7ff; }
 .file-icon { color:#1890ff; margin-top:2px; flex-shrink:0; }

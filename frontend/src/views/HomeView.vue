@@ -27,7 +27,7 @@ async function load() {
   try {
     await store.loadFolders()
   } catch {
-    // 文件夹接口未就绪时不影响首页空态
+    message.warning('目录列表加载失败，请检查后端服务是否已更新并重启')
   }
 }
 
