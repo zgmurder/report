@@ -120,6 +120,16 @@ class ReportRepository:
         self.db.commit()
         return True
 
+    def confirm_draft(self, report_id: int) -> ReportDetail | None:
+        row = self.db.get(ReportDocument, report_id)
+        if not row or not row.draft_json:
+            return None
+        row.content_json = row.draft_json
+        row.status = "confirmed"
+        self.db.commit()
+        self.db.refresh(row)
+        return self._to_detail(row)
+
     def save_content(self, report_id: int, content: ReportContent, html_snapshot: str | None = None) -> ReportDetail | None:
         row = self.db.get(ReportDocument, report_id)
         if not row:

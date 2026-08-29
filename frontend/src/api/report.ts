@@ -77,6 +77,14 @@ export function deleteReport(id: number) {
   return apiDelete<{ deleted: boolean }>(`/reports/${id}`)
 }
 
+export function confirmReportDraft(id: number) {
+  return apiPost<ReportItem>(`/reports/${id}/confirm`)
+}
+
+export function exportReportHtmlUrl(id: number) {
+  return `/api/v1/reports/${id}/export-html`
+}
+
 export function generateReportDraft(id: number, data: { report_type: string; source_query: Record<string, unknown> }) {
   return apiPost<{ draft_json: ReportContent; explanation: string; warnings: string[] }>(`/reports/${id}/generate-draft`, data)
 }

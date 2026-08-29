@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import {
+  confirmReportDraft,
   createReport,
   generateReportDraft,
   createReportFolder,
@@ -85,6 +86,12 @@ export const useReportStore = defineStore('report', {
       this.editingContent = result.draft_json
       await this.loadReport(id)
       return result
+    },
+    async confirmDraft(id: number) {
+      const report = await confirmReportDraft(id)
+      await this.loadReport(id)
+      await this.loadReports()
+      return report
     },
     async save(id: number, content?: ReportContent, htmlSnapshot?: string) {
       const target = content || this.editingContent

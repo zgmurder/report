@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Download, Save, Sparkles } from 'lucide-vue-next'
-import type { ReportContent } from '@/api/report'
+import { exportReportHtmlUrl, type ReportContent } from '@/api/report'
 import ReportAssistantSidebar from '@/components/editor/ReportAssistantSidebar.vue'
 import ReportUmoEditor from '@/components/editor/ReportUmoEditor.vue'
 import { useReportStore } from '@/stores/report'
@@ -33,6 +33,15 @@ function insertHtml(fragment: string) {
   html.value = `${html.value || ''}${fragment}`
 }
 
+async function confirmDraft() {
+  await store.confirmDraft(reportId)
+  html.value = store.htmlSnapshot || contentToHtml(store.editingContent)
+}
+
+function exportHtml() {
+  window.open(exportReportHtmlUrl(reportId), '_blank')
+}
+
 async function save(value = html.value) {
   const content: ReportContent = {
     title: title.value,
@@ -60,7 +69,8 @@ onMounted(async () => {
       </div>
       <div class="editor-actions">
         <button class="ghost-btn" @click="generateDraft"><Sparkles :size="16" /> AI 草稿</button>
-        <button class="ghost-btn"><Download :size="16" /> 导出</button>
+        <button class="ghost-btn" @click="confirmDraft"><Sparkles :size="16" /> 确认草稿</button>
+        <button class="ghost-btn" @click="exportHtml"><Download :size="16" /> 导出 HTML</button>
         <button class="primary-btn" @click="save()"><Save :size="16" /> 保存</button>
       </div>
     </header>

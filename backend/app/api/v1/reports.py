@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -67,6 +67,16 @@ def update_report(report_id: int, req: ReportUpdateRequest, service: ReportServi
 @router.delete("/{report_id}")
 def delete_report(report_id: int, service: ReportService = Depends(get_service)):
     return ok(service.delete(report_id))
+
+
+@router.post("/{report_id}/confirm")
+def confirm_report(report_id: int, service: ReportService = Depends(get_service)):
+    return ok(service.confirm_draft(report_id))
+
+
+@router.get("/{report_id}/export-html")
+def export_report_html(report_id: int, service: ReportService = Depends(get_service)):
+    return Response(content=service.export_html(report_id), media_type="text/html; charset=utf-8")
 
 
 @router.put("/{report_id}/content")

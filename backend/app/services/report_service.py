@@ -7,6 +7,7 @@ from app.core.security import CurrentUser
 from app.domain.ai.client import AiClient
 from app.domain.report.validator import validate_report_content
 from app.repositories.report_repository import ReportRepository
+from app.services.export_service import ExportService
 from app.schemas.report import (
     AiDraftResponse,
     ReportCreateRequest,
@@ -25,6 +26,7 @@ class ReportService:
     def __init__(self, db: Session, current_user: CurrentUser):
         self.repository = ReportRepository(db)
         self.ai_client = AiClient()
+        self.export_service = ExportService()
         self.current_user = current_user
 
     def create(self, req: ReportCreateRequest) -> ReportDetail:
@@ -74,6 +76,16 @@ class ReportService:
         if not deleted:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="报告不存在")
         return {"deleted": True}
+
+    def confirm_draft(self, report_id: int) -> ReportDetail:
+        report = self.repository.confirm_draft(report_id)
+        if not report:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="报告不存在或没有可确认的草稿")
+        return report
+
+    def export_html(self, report_id: int) -> str:
+        report = self.get(report_id)
+        return self.export_service.render_report_html(report)
 
     def save(self, report_id: int, req: ReportSaveRequest) -> ReportDetail:
         content = self._validate_content(req.content_json)
