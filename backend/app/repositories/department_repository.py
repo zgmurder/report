@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import datetime
+from types import SimpleNamespace
+
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -31,13 +34,80 @@ class DepartmentRepository:
         self.db.add_all([Department(**item, parent_id=root.id, status="enabled") for item in CHILD_DEPARTMENT_SEEDS])
         self.db.commit()
 
-    def list(self, include_disabled: bool = False) -> list[Department]:
+    def list(self, include_disabled: bool = False) -> list:
+        external_rows = self._list_police_stations_from_jz_dept(include_disabled=include_disabled)
+        if external_rows:
+            return external_rows
+
         self.ensure_seed_data()
         stmt = select(Department)
         if not include_disabled:
             stmt = stmt.where(Department.status == "enabled")
         stmt = stmt.order_by(Department.sort_order.asc(), Department.id.asc())
         return list(self.db.scalars(stmt).all())
+
+    def _list_police_stations_from_jz_dept(self, include_disabled: bool = False) -> list:
+        if not self._table_exists("jz_dept"):
+            return []
+
+        conditions = [
+            "(short_dept_name LIKE :keyword OR detail_dept_name LIKE :keyword)",
+        ]
+        params = {"keyword": "%派出所%"}
+        if not include_disabled:
+            conditions.extend([
+                "COALESCE(del_flag, '0') = '0'",
+                "COALESCE(status, '0') = '0'",
+                "COALESCE(is_show, '1') = '1'",
+            ])
+        rows = self.db.execute(
+            text(
+                f"""
+                SELECT
+                    dept_code,
+                    parent_dept_code,
+                    COALESCE(NULLIF(short_dept_name, ''), NULLIF(detail_dept_name, ''), dept_code) AS name,
+                    COALESCE(sort, 0) AS sort_order,
+                    COALESCE(status, '0') AS status,
+                    create_time,
+                    update_time
+                FROM jz_dept
+                WHERE {' AND '.join(conditions)}
+                ORDER BY COALESCE(sort, 9999), dept_code
+                """
+            ),
+            params,
+        ).mappings().all()
+        now = datetime.now()
+        return [
+            SimpleNamespace(
+                id=index,
+                name=row["name"],
+                code=row["dept_code"],
+                parent_id=None,
+                parent_code=row["parent_dept_code"],
+                sort_order=int(row["sort_order"] or 0),
+                status="enabled" if row["status"] == "0" else "disabled",
+                created_at=row["create_time"] or now,
+                updated_at=row["update_time"] or row["create_time"] or now,
+            )
+            for index, row in enumerate(rows, start=1)
+        ]
+
+    def _table_exists(self, table_name: str) -> bool:
+        return bool(
+            self.db.execute(
+                text(
+                    """
+                    SELECT 1
+                    FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name
+                    LIMIT 1
+                    """
+                ),
+                {"table_name": table_name},
+            ).scalar()
+        )
 
     def tree(self, include_disabled: bool = False) -> list[DepartmentTreeItem]:
         rows = self.list(include_disabled=include_disabled)
