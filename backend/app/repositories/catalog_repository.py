@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -81,10 +83,68 @@ class CatalogRepository:
         self.ensure_seed_data()
         return self.db.scalars(select(ReportTemplate).order_by(ReportTemplate.updated_at.desc(), ReportTemplate.id.desc())).all()
 
+    def create_template(self, data: dict) -> ReportTemplate:
+        row = ReportTemplate(**data)
+        self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
+    def update_template(self, template_id: int, data: dict) -> ReportTemplate | None:
+        return self._update(ReportTemplate, template_id, data)
+
+    def delete_template(self, template_id: int) -> bool:
+        return self._delete(ReportTemplate, template_id)
+
     def list_components(self) -> list[StatComponent]:
         self.ensure_seed_data()
         return self.db.scalars(select(StatComponent).order_by(StatComponent.id.asc())).all()
 
+    def create_component(self, data: dict) -> StatComponent:
+        row = StatComponent(**data)
+        self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
+    def update_component(self, component_id: int, data: dict) -> StatComponent | None:
+        return self._update(StatComponent, component_id, data)
+
+    def delete_component(self, component_id: int) -> bool:
+        return self._delete(StatComponent, component_id)
+
     def list_data_sources(self) -> list[DataSourceConfig]:
         self.ensure_seed_data()
         return self.db.scalars(select(DataSourceConfig).order_by(DataSourceConfig.id.asc())).all()
+
+    def create_data_source(self, data: dict) -> DataSourceConfig:
+        row = DataSourceConfig(**data)
+        self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
+    def update_data_source(self, data_source_id: int, data: dict) -> DataSourceConfig | None:
+        return self._update(DataSourceConfig, data_source_id, data)
+
+    def delete_data_source(self, data_source_id: int) -> bool:
+        return self._delete(DataSourceConfig, data_source_id)
+
+    def _update(self, model, row_id: int, data: dict):
+        row = self.db.get(model, row_id)
+        if not row:
+            return None
+        for key, value in data.items():
+            if value is not None:
+                setattr(row, key, value)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
+    def _delete(self, model, row_id: int) -> bool:
+        row = self.db.get(model, row_id)
+        if not row:
+            return False
+        self.db.delete(row)
+        self.db.commit()
+        return True
