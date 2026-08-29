@@ -30,6 +30,12 @@ class ReportCreateRequest(BaseModel):
     source_query: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReportUpdateRequest(BaseModel):
+    title: str | None = None
+    folder_id: int | None = None
+    status: ReportStatus | None = None
+
+
 class ReportSaveRequest(BaseModel):
     content_json: ReportContent
     html_snapshot: str | None = None
@@ -66,6 +72,12 @@ class AiDraftResponse(BaseModel):
 class ReportFolderCreateRequest(BaseModel):
     name: str
     parent_id: int | None = None
+
+
+class ReportFolderUpdateRequest(BaseModel):
+    name: str | None = None
+    parent_id: int | None = None
+    sort_order: int | None = None
 
 
 class ReportFolderItem(BaseModel):

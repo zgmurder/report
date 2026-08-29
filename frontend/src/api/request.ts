@@ -33,3 +33,8 @@ export async function apiPut<T>(url: string, data?: unknown): Promise<T> {
   const res = await request.put<ApiResponse<T>>(url, data)
   return res.data.data
 }
+
+export async function apiDelete<T>(url: string): Promise<T> {
+  const res = await request.delete<ApiResponse<T>>(url)
+  return res.data.data
+}

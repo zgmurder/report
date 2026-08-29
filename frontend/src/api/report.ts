@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from './request'
+import { apiDelete, apiGet, apiPost, apiPut } from './request'
 
 export interface ReportSection {
   id: string
@@ -57,8 +57,24 @@ export function createReportFolder(data: { name: string; parent_id?: number | nu
   return apiPost<ReportFolderItem>('/reports/folders', data)
 }
 
+export function updateReportFolder(id: number, data: { name?: string; parent_id?: number | null; sort_order?: number }) {
+  return apiPut<ReportFolderItem>(`/reports/folders/${id}`, data)
+}
+
+export function deleteReportFolder(id: number) {
+  return apiDelete<{ deleted: boolean }>(`/reports/folders/${id}`)
+}
+
 export function getReport(id: number) {
   return apiGet<ReportItem>(`/reports/${id}`)
+}
+
+export function updateReport(id: number, data: { title?: string; folder_id?: number | null; status?: string }) {
+  return apiPut<ReportItem>(`/reports/${id}`, data)
+}
+
+export function deleteReport(id: number) {
+  return apiDelete<{ deleted: boolean }>(`/reports/${id}`)
 }
 
 export function generateReportDraft(id: number, data: { report_type: string; source_query: Record<string, unknown> }) {

@@ -13,9 +13,11 @@ from app.schemas.report import (
     ReportDetail,
     ReportFolderCreateRequest,
     ReportFolderItem,
+    ReportFolderUpdateRequest,
     ReportGenerateRequest,
     ReportItem,
     ReportSaveRequest,
+    ReportUpdateRequest,
 )
 
 
@@ -37,11 +39,41 @@ class ReportService:
     def create_folder(self, req: ReportFolderCreateRequest) -> ReportFolderItem:
         return self.repository.create_folder(req.name, req.parent_id, created_by=self.current_user.id)
 
+    def update_folder(self, folder_id: int, req: ReportFolderUpdateRequest) -> ReportFolderItem:
+        folder = self.repository.update_folder(folder_id, req.name, req.parent_id, req.sort_order)
+        if not folder:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件夹不存在")
+        return folder
+
+    def delete_folder(self, folder_id: int) -> dict[str, bool]:
+        deleted = self.repository.delete_folder(folder_id)
+        if not deleted:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件夹不存在")
+        return {"deleted": True}
+
     def get(self, report_id: int) -> ReportDetail:
         report = self.repository.get(report_id)
         if not report:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="报告不存在")
         return report
+
+    def update(self, report_id: int, req: ReportUpdateRequest) -> ReportDetail:
+        report = self.repository.update(
+            report_id,
+            title=req.title,
+            folder_id=req.folder_id,
+            status=req.status,
+            folder_id_provided="folder_id" in req.model_fields_set,
+        )
+        if not report:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="报告不存在")
+        return report
+
+    def delete(self, report_id: int) -> dict[str, bool]:
+        deleted = self.repository.delete(report_id)
+        if not deleted:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="报告不存在")
+        return {"deleted": True}
 
     def save(self, report_id: int, req: ReportSaveRequest) -> ReportDetail:
         content = self._validate_content(req.content_json)

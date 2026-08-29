@@ -3,10 +3,14 @@ import {
   createReport,
   generateReportDraft,
   createReportFolder,
+  deleteReport,
+  deleteReportFolder,
   getReport,
   listReportFolders,
   listReports,
   saveReportContent,
+  updateReport,
+  updateReportFolder,
   type ReportContent,
   type ReportFolderItem,
   type ReportItem,
@@ -39,6 +43,36 @@ export const useReportStore = defineStore('report', {
       await this.loadReports()
       this.currentReport = report
       return report
+    },
+    async renameFolder(id: number, name: string) {
+      const folder = await updateReportFolder(id, { name })
+      await this.loadFolders()
+      return folder
+    },
+    async removeFolder(id: number) {
+      await deleteReportFolder(id)
+      await Promise.all([this.loadFolders(), this.loadReports()])
+    },
+    async renameReport(id: number, title: string) {
+      const report = await updateReport(id, { title })
+      await this.loadReports()
+      if (this.currentReport?.id === id) this.currentReport = report
+      return report
+    },
+    async moveReport(id: number, folderId: number | null) {
+      const report = await updateReport(id, { folder_id: folderId })
+      await this.loadReports()
+      if (this.currentReport?.id === id) this.currentReport = report
+      return report
+    },
+    async removeReport(id: number) {
+      await deleteReport(id)
+      await this.loadReports()
+      if (this.currentReport?.id === id) {
+        this.currentReport = null
+        this.editingContent = null
+        this.htmlSnapshot = ''
+      }
     },
     async loadReport(id: number) {
       this.currentReport = await getReport(id)
