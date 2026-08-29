@@ -15,7 +15,11 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
 
     jwt_secret_key: str = "please-change-me"
+    jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440
+    admin_username: str = "admin"
+    admin_password: str = "admin123"
+    admin_display_name: str = "系统管理员"
 
     llm_provider: str = "mock"
     llm_api_key: str = ""

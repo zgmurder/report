@@ -11,12 +11,24 @@ const request = axios.create({
   timeout: 30000,
 })
 
+request.interceptors.request.use((config) => {
+  const token = localStorage.getItem('report_access_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 request.interceptors.response.use((response) => {
   const payload = response.data as ApiResponse<unknown>
   if (payload && typeof payload.code === 'number' && payload.code !== 0) {
     return Promise.reject(new Error(payload.message || '请求失败'))
   }
   return response
+}, (error) => {
+  const detail = error?.response?.data?.detail
+  const message = Array.isArray(detail) ? detail[0]?.msg : detail
+  return Promise.reject(new Error(message || error?.message || '请求失败'))
 })
 
 export async function apiGet<T>(url: string): Promise<T> {

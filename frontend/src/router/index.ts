@@ -1,10 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import WorkbenchLayout from '@/layouts/WorkbenchLayout.vue'
+import { useUserStore } from '@/stores/user'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/home/reports' },
+    { path: '/login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
     {
       path: '/home',
       component: WorkbenchLayout,
@@ -25,6 +27,26 @@ const router = createRouter({
     },
     { path: '/editor/:id', redirect: (to) => `/home/editor/${to.params.id}` },
   ],
+})
+
+router.beforeEach(async (to) => {
+  const userStore = useUserStore()
+  if (to.meta.public) {
+    if (to.path === '/login' && userStore.isLoggedIn) return '/home/reports'
+    return true
+  }
+  if (!userStore.isLoggedIn) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  if (!userStore.user) {
+    try {
+      await userStore.loadCurrentUser()
+    } catch {
+      userStore.logout()
+      return { path: '/login', query: { redirect: to.fullPath } }
+    }
+  }
+  return true
 })
 
 export default router

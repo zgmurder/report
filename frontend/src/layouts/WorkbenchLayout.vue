@@ -1,17 +1,28 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NAvatar, NButton, NIcon } from 'naive-ui'
+import { NAvatar, NButton, NDropdown, NIcon } from 'naive-ui'
 import { History, UserRound } from 'lucide-vue-next'
 import { workbenchNavItems } from '@/data/navigation'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
+const userOptions = computed(() => [{ label: '退出登录', key: 'logout' }])
 
 function isActive(path: string) {
   if (path === '/home/reports') {
     return route.path.startsWith('/home/reports') || route.path.startsWith('/home/editor')
   }
   return route.path === path || route.path.startsWith(`${path}/`)
+}
+
+function handleUserAction(key: string) {
+  if (key === 'logout') {
+    userStore.logout()
+    router.replace('/login')
+  }
 }
 </script>
 
@@ -44,15 +55,17 @@ function isActive(path: string) {
           <template #icon><n-icon :component="History" :size="15" /></template>
           更新日志
         </n-button>
-        <div class="user-block">
-          <n-avatar round size="small" :style="{ background: '#f0f0f0', color: '#8c8c8c' }">
-            <n-icon :component="UserRound" :size="16" />
-          </n-avatar>
-          <div class="user-meta">
-            <div class="user-name">ywj</div>
-            <div class="user-org">义乌市局</div>
+        <n-dropdown trigger="click" :options="userOptions" @select="handleUserAction">
+          <div class="user-block">
+            <n-avatar round size="small" :style="{ background: '#f0f0f0', color: '#8c8c8c' }">
+              <n-icon :component="UserRound" :size="16" />
+            </n-avatar>
+            <div class="user-meta">
+              <div class="user-name">{{ userStore.displayName }}</div>
+              <div class="user-org">义乌市局</div>
+            </div>
           </div>
-        </div>
+        </n-dropdown>
       </div>
     </header>
 
@@ -174,6 +187,14 @@ function isActive(path: string) {
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 4px 6px;
+  transition: background .2s;
+}
+
+.user-block:hover {
+  background: #f5f7fb;
 }
 
 .user-meta {
