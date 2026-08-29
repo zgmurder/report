@@ -8,8 +8,6 @@
 backend   FastAPI 后端
 frontend  Vue3 前端
 docs      设计与迁移文档
-sql       数据库脚本
-deploy    部署配置
 scripts   本地启动脚本
 ```
 
