@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
+import { NAvatar, NButton, NIcon } from 'naive-ui'
 import { History, UserRound } from 'lucide-vue-next'
 import { workbenchNavItems } from '@/data/navigation'
 
@@ -39,12 +40,14 @@ function isActive(path: string) {
       </nav>
 
       <div class="top-actions">
-        <button class="log-link" type="button">
-          <History :size="15" :stroke-width="1.75" />
-          <span>更新日志</span>
-        </button>
+        <n-button text>
+          <template #icon><n-icon :component="History" :size="15" /></template>
+          更新日志
+        </n-button>
         <div class="user-block">
-          <span class="avatar"><UserRound :size="18" :stroke-width="1.6" /></span>
+          <n-avatar round size="small" :style="{ background: '#f0f0f0', color: '#8c8c8c' }">
+            <n-icon :component="UserRound" :size="16" />
+          </n-avatar>
           <div class="user-meta">
             <div class="user-name">ywj</div>
             <div class="user-org">义乌市局</div>
@@ -58,6 +61,7 @@ function isActive(path: string) {
     </main>
   </div>
 </template>
+
 
 <style scoped>
 .app-shell {
@@ -113,7 +117,7 @@ function isActive(path: string) {
 .main-nav {
   flex: 1;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: stretch;
   gap: 4px;
 }
@@ -166,36 +170,10 @@ function isActive(path: string) {
   justify-content: flex-end;
 }
 
-.log-link {
-  border: 0;
-  background: transparent;
-  color: #595959;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  font-size: 13px;
-}
-
-.log-link:hover {
-  color: var(--color-primary);
-}
-
 .user-block {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #f0f0f0;
-  color: #8c8c8c;
-  display: grid;
-  place-items: center;
-  border: 1px solid #e8e8e8;
 }
 
 .user-meta {
@@ -226,6 +204,5 @@ function isActive(path: string) {
   .main-nav { justify-content: flex-start; overflow-x: auto; }
   .nav-item { min-width: 72px; padding: 0 12px; }
   .top-actions { min-width: auto; gap: 12px; }
-  .log-link span { display: none; }
 }
 </style>

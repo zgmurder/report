@@ -10,6 +10,7 @@
 ## 架构原则
 - 后端采用 Router -> Service -> Repository 分层。
 - 前端采用 View -> Store/Composable -> API Client -> Component 分层。
+- 前端 UI 组件库使用 Naive UI（主题主色 `#1890ff`），图标可继续使用 lucide-vue-next。
 - 报告内容以结构化 JSON 作为权威数据，HTML/Docx/PDF 是派生产物。
 - AI 默认只生成草稿，必须经过校验和人工确认后保存。
 - SQL 必须参数绑定，禁止拼接用户输入。

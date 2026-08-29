@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { BookOpen, ChevronDown, FileText, FolderOpen, FolderPlus, PanelLeftClose, RefreshCw } from 'lucide-vue-next'
+import { computed, onMounted, ref, watch } from 'vue'
+import { NButton, NIcon, NSelect, NTooltip } from 'naive-ui'
+import { BookOpen, FileText, FolderOpen, FolderPlus, PanelLeftClose, RefreshCw } from 'lucide-vue-next'
 import type { ReportFolderItem, ReportItem } from '@/api/report'
+import { useDepartmentStore } from '@/stores/department'
 
 const props = defineProps<{
   reports: ReportItem[]
@@ -20,8 +22,10 @@ const emit = defineEmits<{
   templates: []
 }>()
 
+const departmentStore = useDepartmentStore()
 const folderExpanded = ref(true)
-const deptLabel = '义乌市局'
+const dept = ref<string | null>(null)
+const deptOptions = computed(() => departmentStore.options)
 
 const displayReports = computed(() => props.reports)
 const reportCount = computed(() => displayReports.value.length)
@@ -44,9 +48,24 @@ function formatTime(value: string) {
 }
 
 function chooseFolder(id: number) {
-  emit('select-folder', props.selectedFolderId === id ? null : id)
+  const nextId = id === 0 || props.selectedFolderId === id ? null : id
+  emit('select-folder', nextId)
   folderExpanded.value = true
 }
+
+watch(
+  () => departmentStore.departments,
+  (departments) => {
+    if (!dept.value && departments.length) dept.value = departments[0].code
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
+  departmentStore.loadDepartments().catch(() => {
+    // 部门接口不可用时下拉保持空态，不影响目录/报告功能。
+  })
+})
 </script>
 
 <template>
@@ -55,24 +74,54 @@ function chooseFolder(id: number) {
       <div class="sidebar-head">
         <h3>报告</h3>
         <div class="head-actions">
-          <button class="icon-btn" type="button" title="新建文件夹" @click="emit('create-folder')"><FolderPlus :size="16" /></button>
-          <button class="icon-btn" type="button" title="刷新" @click="emit('refresh')"><RefreshCw :size="15" /></button>
+          <n-tooltip trigger="hover">
+            <template #trigger>
+              <n-button quaternary circle size="small" @click="emit('create-folder')">
+                <template #icon><n-icon :component="FolderPlus" :size="16" /></template>
+              </n-button>
+            </template>
+            新建文件夹
+          </n-tooltip>
+          <n-tooltip trigger="hover">
+            <template #trigger>
+              <n-button quaternary circle size="small" @click="emit('refresh')">
+                <template #icon><n-icon :component="RefreshCw" :size="15" /></template>
+              </n-button>
+            </template>
+            刷新
+          </n-tooltip>
         </div>
       </div>
 
-      <button class="dept-select" type="button"><span>{{ deptLabel }}</span><ChevronDown :size="14" /></button>
+      <div class="dept-wrap">
+        <n-select v-model:value="dept" :options="deptOptions" size="medium" />
+      </div>
 
       <div class="tree">
         <div class="tree-summary">全部报告 ({{ reportCount }})</div>
-        <button v-for="folder in visibleFolders" :key="folder.id" class="folder-row" type="button" :class="{ active: selectedFolderId === folder.id }" @click="chooseFolder(folder.id)">
-          <FolderOpen :size="16" class="folder-icon" />
+        <button
+          v-for="folder in visibleFolders"
+          :key="folder.id"
+          class="folder-row"
+          type="button"
+          :class="{ active: selectedFolderId === folder.id }"
+          @click="chooseFolder(folder.id)"
+        >
+          <n-icon :component="FolderOpen" :size="16" class="folder-icon" />
           <span>{{ folder.name }}</span>
           <em>{{ folder.report_count }}</em>
         </button>
 
         <div v-show="folderExpanded" class="file-list">
-          <button v-for="report in visibleReports" :key="report.id" class="file-row" type="button" :class="{ active: selectedReportId === report.id }" @click="emit('open-report', report)">
-            <FileText :size="15" class="file-icon" />
+          <button
+            v-for="report in visibleReports"
+            :key="report.id"
+            class="file-row"
+            type="button"
+            :class="{ active: selectedReportId === report.id }"
+            @click="emit('open-report', report)"
+          >
+            <n-icon :component="FileText" :size="15" class="file-icon" />
             <div class="file-meta">
               <div class="file-title">{{ report.title }}</div>
               <div class="file-time">最后修改于 {{ formatTime(report.updated_at) }}</div>
@@ -82,24 +131,29 @@ function chooseFolder(id: number) {
       </div>
 
       <div class="sidebar-foot">
-        <button class="template-btn" type="button" @click="emit('templates')"><BookOpen :size="15" /><span>模板库</span></button>
-        <button class="icon-btn collapse-btn" type="button" title="收起侧栏" @click="emit('update:collapsed', true)"><PanelLeftClose :size="16" /></button>
+        <n-button class="template-btn" secondary block @click="emit('templates')">
+          <template #icon><n-icon :component="BookOpen" :size="15" /></template>
+          模板库
+        </n-button>
+        <n-button quaternary circle size="small" @click="emit('update:collapsed', true)">
+          <template #icon><n-icon :component="PanelLeftClose" :size="16" /></template>
+        </n-button>
       </div>
     </template>
 
-    <button v-else class="expand-btn" type="button" title="展开侧栏" @click="emit('update:collapsed', false)"><FileText :size="18" /></button>
+    <n-button v-else type="primary" ghost circle @click="emit('update:collapsed', false)">
+      <template #icon><n-icon :component="FileText" :size="18" /></template>
+    </n-button>
   </aside>
 </template>
 
 <style scoped>
 .sidebar { width: var(--sidebar-width); flex-shrink:0; background:#fff; border-right:1px solid #e8e8e8; display:flex; flex-direction:column; min-height:0; transition:width .2s ease; }
 .sidebar.collapsed { width:48px; align-items:center; padding-top:12px; }
-.sidebar-head { height:48px; padding:0 12px 0 16px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.sidebar-head { height:48px; padding:0 8px 0 16px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
 .sidebar-head h3 { margin:0; font-size:16px; font-weight:600; color:#262626; }
 .head-actions { display:flex; align-items:center; gap:2px; }
-.icon-btn { width:28px; height:28px; border:0; border-radius:4px; background:transparent; color:#595959; display:inline-flex; align-items:center; justify-content:center; }
-.icon-btn:hover { color:#1890ff; background:#e6f7ff; }
-.dept-select { margin:0 12px 12px; height:32px; border:1px solid #d9d9d9; border-radius:4px; background:#fff; display:flex; align-items:center; justify-content:space-between; padding:0 10px; color:#262626; }
+.dept-wrap { padding:0 12px 12px; }
 .tree { flex:1; min-height:0; overflow:auto; padding:0 8px 12px; }
 .tree-summary { padding:6px 8px 10px; font-size:12px; color:#8c8c8c; }
 .folder-row { width:100%; border:0; background:transparent; border-radius:4px; padding:8px; display:flex; align-items:center; gap:8px; color:#262626; text-align:left; font-weight:500; }
@@ -116,8 +170,5 @@ function chooseFolder(id: number) {
 .file-row.active .file-title, .file-row:hover .file-title { color:#1890ff; }
 .file-time { margin-top:2px; font-size:11px; color:#8c8c8c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .sidebar-foot { height:48px; border-top:1px solid #f0f0f0; padding:8px; display:flex; align-items:center; gap:6px; flex-shrink:0; }
-.template-btn { flex:1; height:32px; border:0; border-radius:4px; background:#f5f5f5; color:#595959; display:flex; align-items:center; justify-content:center; gap:6px; }
-.template-btn:hover { color:#1890ff; background:#e6f7ff; }
-.collapse-btn { flex-shrink:0; }
-.expand-btn { width:36px; height:36px; border:0; border-radius:8px; background:#e6f7ff; color:#1890ff; display:flex; align-items:center; justify-content:center; }
+.template-btn { flex:1; }
 </style>

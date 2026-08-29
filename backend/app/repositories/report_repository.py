@@ -30,6 +30,11 @@ class ReportRepository:
         rows = self.db.scalars(select(ReportDocument).order_by(ReportDocument.updated_at.desc(), ReportDocument.id.desc())).all()
         return [self._to_item(row) for row in rows]
 
+    def folder_exists(self, folder_id: int | None) -> bool:
+        if folder_id is None:
+            return True
+        return self.db.get(ReportFolder, folder_id) is not None
+
     def list_folders(self) -> list[ReportFolderItem]:
         rows = self.db.scalars(select(ReportFolder).order_by(ReportFolder.sort_order.asc(), ReportFolder.id.asc())).all()
         counts = dict(self.db.execute(select(ReportDocument.folder_id, func.count()).group_by(ReportDocument.folder_id)).all())

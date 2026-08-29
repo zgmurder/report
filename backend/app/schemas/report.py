@@ -24,14 +24,14 @@ class ReportContent(BaseModel):
 
 
 class ReportCreateRequest(BaseModel):
-    title: str
-    report_type: str = "monthly"
+    title: str = Field(..., min_length=1, max_length=200)
+    report_type: str = Field(default="monthly", min_length=1, max_length=50)
     folder_id: int | None = None
     source_query: dict[str, Any] = Field(default_factory=dict)
 
 
 class ReportUpdateRequest(BaseModel):
-    title: str | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=200)
     folder_id: int | None = None
     status: ReportStatus | None = None
 
@@ -70,12 +70,12 @@ class AiDraftResponse(BaseModel):
 
 
 class ReportFolderCreateRequest(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=120)
     parent_id: int | None = None
 
 
 class ReportFolderUpdateRequest(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=120)
     parent_id: int | None = None
     sort_order: int | None = None
 
