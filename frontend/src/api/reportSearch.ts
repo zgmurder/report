@@ -84,6 +84,7 @@ export interface SearchResult {
   rows: Record<string, unknown>[]
   row_count: number
   elapsed_ms: number
+  executed_sql: string
   truncated: boolean
 }
 

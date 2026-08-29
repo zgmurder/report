@@ -114,21 +114,23 @@ class ReportSearchService:
         invalid_measures = set(request.measures) - set(measures)
         if invalid_dimensions or invalid_measures:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="包含不支持的查询指标")
-        for level, codes in (
-            ("category", request.category_codes),
-            ("type", request.type_codes),
-            ("detail", request.detail_codes),
+        if "proportion" in request.measures and not any(
+            (request.category_codes, request.type_codes, request.detail_codes)
         ):
-            if any(not self.repository.is_classification_enabled(request.source, level, code) for code in codes):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="所选分类已被全局禁用")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="占比指标需要先选择类别、类型或细类")
         if not current_user.unit_code:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前账号未配置部门")
 
         started = perf_counter()
-        rows = self.repository.execute(request, current_user.unit_code)
+        rows, executed_sql = self.repository.execute(request, current_user.unit_code)
         truncated = len(rows) > request.limit
         rows = rows[: request.limit]
-        if not request.dimensions and any((request.category_codes, request.type_codes, request.detail_codes)):
+        is_classification_result = not request.dimensions and any(
+            (request.category_codes, request.type_codes, request.detail_codes)
+        )
+        if not request.dimensions:
+            self._calculate_comparison_metrics(rows, request.measures, is_classification_result)
+        if is_classification_result:
             level_keys = {"类别": "category", "类型": "type", "细类": "detail"}
             name_maps = {
                 level: {str(item["code"]): str(item["name"]) for item in self.repository.list_all_classifications(request.source, level)}
@@ -141,12 +143,13 @@ class ReportSearchService:
                 SearchResultColumn(key="classification_level", label="分类层级"),
                 SearchResultColumn(key="classification_name", label="分类名称"),
                 SearchResultColumn(key="classification_code", label="分类代码"),
-                SearchResultColumn(key="event_count", label=measures["event_count"].label, type="number"),
+                *(SearchResultColumn(key=key, label=measures[key].label, type="number") for key in request.measures),
             ]
         else:
             columns = [
                 SearchResultColumn(key=item.key, label=item.label, type=item.result_type)
                 for item in [*(dimensions[key] for key in request.dimensions), *(measures[key] for key in request.measures)]
+                if item.key != "proportion" or bool(request.dimensions)
             ]
         return ReportSearchResult(
             source=SearchDataSource(**DATA_SOURCES[request.source]),
@@ -155,8 +158,31 @@ class ReportSearchService:
             rows=rows,
             row_count=len(rows),
             elapsed_ms=round((perf_counter() - started) * 1000),
+            executed_sql=executed_sql,
             truncated=truncated,
         )
+
+    @staticmethod
+    def _calculate_comparison_metrics(rows: list[dict], selected_measures: list[str], include_proportion: bool) -> None:
+        for row in rows:
+            current = int(row.get("event_count") or 0)
+            year_base = int(row.pop("year_base_count", 0) or 0)
+            period_base = int(row.pop("period_base_count", 0) or 0)
+            proportion_base = int(row.pop("proportion_base_count", 0) or 0)
+            calculated = {
+                "event_count": current,
+                "year_on_year_change": current - year_base,
+                "year_on_year_rate": round((current - year_base) / year_base * 100, 2) if year_base else None,
+                "period_on_period_change": current - period_base,
+                "period_on_period_rate": round((current - period_base) / period_base * 100, 2) if period_base else None,
+                "proportion": round(current / proportion_base * 100, 2) if include_proportion and proportion_base else None,
+            }
+            for key in list(row):
+                if key in calculated and key not in selected_measures:
+                    row.pop(key, None)
+            for key in selected_measures:
+                if key in calculated and (key != "proportion" or include_proportion):
+                    row[key] = calculated[key]
 
     def _department(self, current_user: CurrentUser) -> SearchDepartment:
         code = current_user.unit_code or ""

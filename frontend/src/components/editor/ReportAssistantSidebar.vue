@@ -3,20 +3,22 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   NAlert,
   NButton,
-  NDataTable,
+  NCheckbox,
+  NCheckboxGroup,
   NDatePicker,
   NEmpty,
   NIcon,
+  NModal,
   NSelect,
   NSpace,
   NSpin,
+  NStatistic,
   NTabPane,
   NTabs,
   NTag,
   useMessage,
-  type DataTableColumns,
 } from 'naive-ui'
-import { Bot, Database, FileInput, RefreshCw, Search } from 'lucide-vue-next'
+import { Bot, Code2, Database, FileInput, RefreshCw, Search } from 'lucide-vue-next'
 import { useDepartmentStore } from '@/stores/department'
 import { useUserStore } from '@/stores/user'
 import type { DepartmentItem } from '@/api/department'
@@ -47,11 +49,13 @@ const activeTimePreset = ref('yesterday')
 const categoryCodes = ref<string[]>([])
 const typeCodes = ref<string[]>([])
 const detailCodes = ref<string[]>([])
+const selectedMeasures = ref<string[]>(['event_count'])
 const categories = ref<SearchClassificationItem[]>([])
 const types = ref<SearchClassificationItem[]>([])
 const details = ref<SearchClassificationItem[]>([])
 const loadingClassifications = ref(false)
 const result = ref<SearchResult | null>(null)
+const showSql = ref(false)
 
 const currentUnitCode = computed(() => {
   const configured = userStore.user?.unit_code
@@ -79,14 +83,43 @@ const sourceOptions = computed(() =>
 const categoryOptions = computed(() => categories.value.map((item) => ({ label: item.name, value: item.code })))
 const typeOptions = computed(() => types.value.map((item) => ({ label: item.name, value: item.code })))
 const detailOptions = computed(() => details.value.map((item) => ({ label: item.name, value: item.code })))
-const tableColumns = computed<DataTableColumns<Record<string, unknown>>>(() =>
-  (result.value?.columns || []).map((column) => ({
-    title: column.label,
-    key: column.key,
-    minWidth: column.type === 'number' ? 96 : 120,
-    ellipsis: { tooltip: true },
+const hasClassificationSelection = computed(() => Boolean(categoryCodes.value.length || typeCodes.value.length || detailCodes.value.length))
+const metricOptions = [
+  { value: 'event_count', label: '警情数量' },
+  { value: 'year_on_year_rate', label: '同比' },
+  { value: 'period_on_period_rate', label: '环比' },
+  { value: 'proportion', label: '占比' },
+  { value: 'year_on_year_change', label: '同比数' },
+  { value: 'period_on_period_change', label: '环比数' },
+]
+const totalMetrics = computed(() => {
+  if (result.value?.rows.length !== 1 || 'classification_level' in result.value.rows[0]) return []
+  return result.value.columns.map((column) => ({ key: column.key, label: column.label, value: result.value!.rows[0][column.key] }))
+})
+const classificationCounts = computed(() =>
+  (result.value?.rows || []).filter((row) => 'classification_level' in row).map((row) => ({
+    level: String(row.classification_level || ''),
+    name: String(row.classification_name || row.classification_code || ''),
+    code: String(row.classification_code || ''),
+    metrics: result.value!.columns
+      .filter((column) => !['classification_level', 'classification_name', 'classification_code'].includes(column.key))
+      .map((column) => ({ key: column.key, label: column.label, value: row[column.key] })),
   })),
 )
+
+function formatMetric(key: string, value: unknown) {
+  if (value === null || value === undefined) return '—'
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '—'
+  if (['year_on_year_rate', 'period_on_period_rate', 'proportion'].includes(key)) return `${number > 0 && key !== 'proportion' ? '+' : ''}${number.toFixed(2)}%`
+  return `${number > 0 && ['year_on_year_change', 'period_on_period_change'].includes(key) ? '+' : ''}${number.toLocaleString('zh-CN')}`
+}
+
+function metricClass(key: string, value: unknown) {
+  if (!['year_on_year_rate', 'period_on_period_rate', 'year_on_year_change', 'period_on_period_change'].includes(key)) return ''
+  const number = Number(value)
+  return number > 0 ? 'metric-up' : number < 0 ? 'metric-down' : ''
+}
 
 function startOfDay(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -214,6 +247,10 @@ async function runQuery() {
     message.warning('请选择时间范围')
     return
   }
+  if (!selectedMeasures.value.length) {
+    message.warning('请至少选择一个统计指标')
+    return
+  }
   querying.value = true
   try {
     result.value = await executeReportSearch({
@@ -224,7 +261,7 @@ async function runQuery() {
       type_codes: typeCodes.value,
       detail_codes: detailCodes.value,
       dimensions: [],
-      measures: ['event_count'],
+      measures: selectedMeasures.value,
       limit: 100,
     })
   } catch (error) {
@@ -250,6 +287,7 @@ function insertResult() {
 
 function resetSearch() {
   categoryCodes.value = []
+  selectedMeasures.value = ['event_count']
   typeCodes.value = []
   detailCodes.value = []
   result.value = null
@@ -274,7 +312,13 @@ watch(source, async () => {
   result.value = null
   await loadAllClassifications().catch(() => message.error('查询配置加载失败'))
 })
-watch([categoryCodes, typeCodes, detailCodes], () => { result.value = null })
+watch([categoryCodes, typeCodes, detailCodes], () => {
+  if (!hasClassificationSelection.value) {
+    selectedMeasures.value = selectedMeasures.value.filter((key) => key !== 'proportion')
+  }
+  result.value = null
+})
+watch(selectedMeasures, () => { result.value = null })
 onMounted(async () => {
   if (!userStore.user && userStore.token) {
     await userStore.loadCurrentUser().catch(() => undefined)
@@ -350,6 +394,21 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
                   </div>
                 </div>
               </n-spin>
+              <div class="section-divider"></div>
+              <div class="field">
+                <div class="field-label">统计指标</div>
+                <n-checkbox-group v-model:value="selectedMeasures">
+                  <div class="metric-options">
+                    <n-checkbox
+                      v-for="item in metricOptions"
+                      :key="item.value"
+                      :value="item.value"
+                      :label="item.label"
+                      :disabled="item.value === 'proportion' && !hasClassificationSelection"
+                    />
+                  </div>
+                </n-checkbox-group>
+              </div>
               <n-button type="primary" block :loading="querying" @click="runQuery">
                 <template #icon><n-icon :component="Search" /></template>
                 执行查询
@@ -362,14 +421,48 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
                 <span v-if="result" class="result-meta">{{ result.row_count }} 行 · {{ result.elapsed_ms }} ms</span>
               </div>
               <n-alert v-if="result?.truncated" type="warning" :show-icon="false" class="result-alert">结果超过 100 行，仅展示前 100 行</n-alert>
-              <div v-if="result?.rows.length" class="result-table">
-                <n-data-table :columns="tableColumns" :data="result.rows" :pagination="false" size="small" :max-height="300" />
+              <div v-if="result?.rows.length" class="result-output">
+                <div v-if="totalMetrics.length" class="total-statistic-wrap">
+                  <div class="total-metrics">
+                    <n-statistic
+                      v-for="metric in totalMetrics"
+                      :key="metric.key"
+                      :label="metric.label"
+                      :value="formatMetric(metric.key, metric.value)"
+                      :class="['total-statistic', metricClass(metric.key, metric.value)]"
+                    />
+                  </div>
+                  <n-button size="tiny" secondary class="sql-button" @click="showSql = true">
+                    <template #icon><n-icon :component="Code2" /></template>
+                    SQL
+                  </n-button>
+                </div>
+                <div v-else class="count-list">
+                  <div v-for="item in classificationCounts" :key="`${item.level}-${item.code}`" class="count-item classification-result">
+                    <div class="count-header">
+                      <div class="count-info">
+                        <span class="count-level">{{ item.level }}</span>
+                        <span class="count-name" :title="item.name">{{ item.name }}</span>
+                      </div>
+                      <n-button size="tiny" secondary class="sql-button" @click="showSql = true">
+                        <template #icon><n-icon :component="Code2" /></template>
+                        SQL
+                      </n-button>
+                    </div>
+                    <div class="classification-metrics">
+                      <div v-for="metric in item.metrics" :key="metric.key" class="metric-cell">
+                        <span>{{ metric.label }}</span>
+                        <strong :class="metricClass(metric.key, metric.value)">{{ formatMetric(metric.key, metric.value) }}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <n-button secondary type="primary" block class="insert-button" @click="insertResult">
                   <template #icon><n-icon :component="FileInput" /></template>
                   插入报告
                 </n-button>
               </div>
-              <n-empty v-else description="设置参数并执行查询" size="small" class="result-empty" />
+              <n-empty v-else :description="result ? '当前条件统计数量为 0' : '设置参数并执行查询'" size="small" class="result-empty" />
             </section>
           </div>
         </n-spin>
@@ -389,6 +482,15 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
         </div>
       </n-tab-pane>
     </n-tabs>
+    <n-modal
+      v-model:show="showSql"
+      preset="card"
+      title="本次查询 SQL"
+      :bordered="false"
+      style="width: 680px; max-width: calc(100vw - 32px)"
+    >
+      <pre class="sql-code"><code>{{ result?.executed_sql }}</code></pre>
+    </n-modal>
   </aside>
 </template>
 
@@ -414,11 +516,30 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
 .classification-grid { display: grid; grid-template-columns: 1fr; }
 .classification-grid .field { margin-bottom: 10px; }
 .section-divider { height: 1px; margin: 3px 0 12px; background: #eef0f3; }
-.sub-title { margin-bottom: 10px; }
-.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 6px; }
+.metric-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px 4px; }
+.metric-options :deep(.n-checkbox__label) { padding-left: 5px; font-size: 12px; }
 .result-meta { color: #909399; font-size: 11px; font-weight: 400; }
 .result-alert { margin-bottom: 8px; font-size: 11px; }
-.result-table { min-width: 0; }
+.result-output { min-width: 0; }
+.total-statistic-wrap { position: relative; padding: 14px 54px 14px 12px; border: 1px solid #d9e9fb; border-radius: 8px; background: #f5faff; }
+.total-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 8px; }
+.total-statistic { min-width: 0; text-align: center; }
+.total-statistic :deep(.n-statistic-value) { color: #1890ff; font-size: 24px; font-weight: 700; }
+.total-statistic-wrap > .sql-button { position: absolute; right: 9px; top: 9px; }
+.count-list { max-height: 360px; overflow: auto; display: flex; flex-direction: column; gap: 7px; }
+.count-item { min-width: 0; padding: 9px 10px; border: 1px solid #e8eaee; border-radius: 6px; background: #fafbfc; }
+.count-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.count-info { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.count-level { flex-shrink: 0; padding: 2px 5px; color: #1677d2; background: #eaf4ff; border-radius: 4px; font-size: 10px; }
+.count-name { overflow: hidden; color: #303133; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.classification-metrics { margin-top: 9px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.metric-cell { min-width: 0; padding: 6px 7px; display: flex; align-items: center; justify-content: space-between; gap: 5px; background: #fff; border-radius: 4px; font-size: 11px; }
+.metric-cell span { overflow: hidden; color: #909399; text-overflow: ellipsis; white-space: nowrap; }
+.metric-cell strong { flex-shrink: 0; color: #1890ff; font-size: 14px; font-variant-numeric: tabular-nums; }
+.metric-up, .metric-up :deep(.n-statistic-value) { color: #d03050 !important; }
+.metric-down, .metric-down :deep(.n-statistic-value) { color: #18a058 !important; }
+.sql-button { font-family: Consolas, monospace; }
+.sql-code { max-height: 60vh; margin: 0; padding: 14px; overflow: auto; color: #d4d4d4; background: #1e1e1e; border-radius: 6px; font-family: Consolas, 'Courier New', monospace; font-size: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
 .insert-button { margin-top: 10px; }
 .result-empty { padding: 28px 0 34px; }
 .ai-card h3 { margin: 0 0 8px; font-size: 15px; }

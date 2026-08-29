@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import text
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Session
 
 from app.core.time import local_now
@@ -51,18 +54,6 @@ class ReportSearchRepository:
                 values,
             )
         self.db.commit()
-
-    def is_classification_enabled(self, source: str, level: str, code: str) -> bool:
-        count = self.db.execute(
-            text(
-                """
-                SELECT COUNT(*) FROM statistics_dictionary_exclusions
-                WHERE source = :source AND level = :level AND code = :code
-                """
-            ),
-            {"source": source, "level": level, "code": code},
-        ).scalar()
-        return not bool(count)
 
     def list_all_classifications(self, source: str, level: str) -> list[dict]:
         if source == "jjd_jjd":
@@ -156,76 +147,70 @@ class ReportSearchRepository:
         ).scalar()
         return str(name or unit_code)
 
-    def execute(self, query: ReportSearchQuery, unit_code: str | None) -> list[dict]:
-        if not query.dimensions and any((query.category_codes, query.type_codes, query.detail_codes)):
-            return self._execute_independent_classification_counts(query, unit_code)
+    def execute(self, query: ReportSearchQuery, unit_code: str | None) -> tuple[list[dict], str]:
+        if not query.dimensions:
+            if any((query.category_codes, query.type_codes, query.detail_codes)):
+                return self._execute_independent_classification_counts(query, unit_code)
+            return self._execute_total_comparison(query, unit_code)
 
         source = SOURCE_CONFIG[query.source]
         dimensions = [get_dimensions(query.source)[key] for key in query.dimensions]
-        measures = [get_measures(query.source)[key] for key in query.measures]
-        selections = [f"{item.expression} AS `{item.key}`" for item in dimensions + measures]
-        group_by = [item.expression for item in dimensions]
+        selections = [f"{item.expression} AS `{item.key}`" for item in dimensions]
+        selections.append("COUNT(*) AS `event_count`")
         conditions = [
             f"j.`{source['time_column']}` >= :start_time",
             f"j.`{source['time_column']}` < :end_time",
         ]
-        params: dict = {
-            "start_time": query.start_time,
-            "end_time": query.end_time,
-            "limit": query.limit + 1,
-        }
-
-        disabled = self.get_disabled_codes(query.source)
-        for level, column in (
-            ("category", source["category_column"]),
-            ("type", source["type_column"]),
-            ("detail", source["detail_column"]),
-        ):
-            if disabled[level]:
-                conditions.append(
-                    "NOT EXISTS ("
-                    "SELECT 1 FROM statistics_dictionary_exclusions AS e "
-                    f"WHERE e.source = :exclusion_source AND e.level = '{level}' "
-                    f"AND e.code = CAST(j.`{column}` AS CHAR)"
-                    ")"
-                )
-                params["exclusion_source"] = query.source
-
-        for level, column, codes in (
-            ("category", source["category_column"], query.category_codes),
-            ("type", source["type_column"], query.type_codes),
-            ("detail", source["detail_column"], query.detail_codes),
-        ):
-            if codes:
-                placeholders = []
-                for index, code in enumerate(dict.fromkeys(codes)):
-                    param_name = f"{level}_code_{index}"
-                    placeholders.append(f":{param_name}")
-                    params[param_name] = code
-                conditions.append(f"CAST(j.`{column}` AS CHAR) IN ({', '.join(placeholders)})")
-
-        if unit_code:
-            if unit_code == "330782000000":
-                conditions.append(f"j.`{source['unit_column']}` LIKE :unit_prefix")
-                params["unit_prefix"] = "33078%"
-            else:
-                conditions.append(f"j.`{source['unit_column']}` = :unit_code")
-                params["unit_code"] = unit_code
-
+        params: dict = {"start_time": query.start_time, "end_time": query.end_time, "limit": query.limit + 1}
+        self._append_unit_condition(conditions, params, source, unit_code)
         sql = [
             f"SELECT {', '.join(selections)}",
             f"FROM `{source['table']}` AS j",
             f"WHERE {' AND '.join(conditions)}",
+            f"GROUP BY {', '.join(item.expression for item in dimensions)}",
+            "ORDER BY `event_count` DESC",
+            "LIMIT :limit",
         ]
-        if group_by:
-            sql.append(f"GROUP BY {', '.join(group_by)}")
-        sql.append(f"ORDER BY `{measures[0].key}` DESC")
-        sql.append("LIMIT :limit")
-        return [dict(row) for row in self.db.execute(text("\n".join(sql)), params).mappings().all()]
+        statement = text("\n".join(sql))
+        executed_sql = self._render_sql(statement, params)
+        return [dict(row) for row in self.db.execute(statement, params).mappings().all()], executed_sql
 
-    def _execute_independent_classification_counts(self, query: ReportSearchQuery, unit_code: str | None) -> list[dict]:
+    def _execute_total_comparison(self, query: ReportSearchQuery, unit_code: str | None) -> tuple[list[dict], str]:
         source = SOURCE_CONFIG[query.source]
-        disabled = self.get_disabled_codes(query.source)
+        periods = self._comparison_periods(query.start_time, query.end_time, query.measures)
+        params: dict = {"current_start": periods["current_start"], "current_end": periods["current_end"], "scan_start": periods["scan_start"]}
+        conditions = [
+            f"j.`{source['time_column']}` >= :scan_start",
+            f"j.`{source['time_column']}` < :current_end",
+        ]
+        self._append_unit_condition(conditions, params, source, unit_code)
+        selections = [
+            f"SUM(CASE WHEN j.`{source['time_column']}` >= :current_start AND j.`{source['time_column']}` < :current_end THEN 1 ELSE 0 END) AS event_count"
+        ]
+        if any(key in query.measures for key in ("year_on_year_rate", "year_on_year_change")):
+            params.update(year_start=periods["year_start"], year_end=periods["year_end"])
+            selections.append(
+                f"SUM(CASE WHEN j.`{source['time_column']}` >= :year_start AND j.`{source['time_column']}` < :year_end THEN 1 ELSE 0 END) AS year_base_count"
+            )
+        if any(key in query.measures for key in ("period_on_period_rate", "period_on_period_change")):
+            params.update(period_start=periods["period_start"], period_end=periods["period_end"])
+            selections.append(
+                f"SUM(CASE WHEN j.`{source['time_column']}` >= :period_start AND j.`{source['time_column']}` < :period_end THEN 1 ELSE 0 END) AS period_base_count"
+            )
+        sql = "\n".join(
+            [
+                f"SELECT {', '.join(selections)}",
+                f"FROM `{source['table']}` AS j",
+                f"WHERE {' AND '.join(conditions)}",
+            ]
+        )
+        statement = text(sql)
+        executed_sql = self._render_sql(statement, params)
+        return [dict(row) for row in self.db.execute(statement, params).mappings().all()], executed_sql
+
+    def _execute_independent_classification_counts(self, query: ReportSearchQuery, unit_code: str | None) -> tuple[list[dict], str]:
+        source = SOURCE_CONFIG[query.source]
+        periods = self._comparison_periods(query.start_time, query.end_time, query.measures)
         level_labels = {"category": "类别", "type": "类型", "detail": "细类"}
         selected = (
             ("category", source["category_column"], query.category_codes),
@@ -233,7 +218,11 @@ class ReportSearchRepository:
             ("detail", source["detail_column"], query.detail_codes),
         )
         statements: list[str] = []
-        params: dict = {"start_time": query.start_time, "end_time": query.end_time}
+        params: dict = {"current_start": periods["current_start"], "current_end": periods["current_end"], "scan_start": periods["scan_start"]}
+        if any(key in query.measures for key in ("year_on_year_rate", "year_on_year_change")):
+            params.update(year_start=periods["year_start"], year_end=periods["year_end"])
+        if any(key in query.measures for key in ("period_on_period_rate", "period_on_period_change")):
+            params.update(period_start=periods["period_start"], period_end=periods["period_end"])
 
         for level, column, raw_codes in selected:
             codes = list(dict.fromkeys(raw_codes))
@@ -245,34 +234,37 @@ class ReportSearchRepository:
                 placeholders.append(f":{param_name}")
                 params[param_name] = code
             conditions = [
-                f"j.`{source['time_column']}` >= :start_time",
-                f"j.`{source['time_column']}` < :end_time",
+                f"j.`{source['time_column']}` >= :scan_start",
+                f"j.`{source['time_column']}` < :current_end",
                 f"CAST(j.`{column}` AS CHAR) IN ({', '.join(placeholders)})",
             ]
-            if disabled[level]:
-                exclusion_source = f"exclusion_source_{level}"
-                params[exclusion_source] = query.source
-                conditions.append(
-                    "NOT EXISTS ("
-                    "SELECT 1 FROM statistics_dictionary_exclusions AS e "
-                    f"WHERE e.source = :{exclusion_source} AND e.level = '{level}' "
-                    f"AND e.code = CAST(j.`{column}` AS CHAR)"
-                    ")"
+            self._append_unit_condition(conditions, params, source, unit_code, level)
+            selections = [
+                f"SELECT '{level_labels[level]}' AS classification_level",
+                f"CAST(j.`{column}` AS CHAR) AS classification_code",
+                f"SUM(CASE WHEN j.`{source['time_column']}` >= :current_start AND j.`{source['time_column']}` < :current_end THEN 1 ELSE 0 END) AS event_count",
+            ]
+            if any(key in query.measures for key in ("year_on_year_rate", "year_on_year_change")):
+                selections.append(
+                    f"SUM(CASE WHEN j.`{source['time_column']}` >= :year_start AND j.`{source['time_column']}` < :year_end THEN 1 ELSE 0 END) AS year_base_count"
                 )
-            if unit_code == "330782000000":
-                unit_param = f"unit_prefix_{level}"
-                params[unit_param] = "33078%"
-                conditions.append(f"j.`{source['unit_column']}` LIKE :{unit_param}")
-            elif unit_code:
-                unit_param = f"unit_code_{level}"
-                params[unit_param] = unit_code
-                conditions.append(f"j.`{source['unit_column']}` = :{unit_param}")
+            if any(key in query.measures for key in ("period_on_period_rate", "period_on_period_change")):
+                selections.append(
+                    f"SUM(CASE WHEN j.`{source['time_column']}` >= :period_start AND j.`{source['time_column']}` < :period_end THEN 1 ELSE 0 END) AS period_base_count"
+                )
+            if "proportion" in query.measures:
+                denominator_conditions = [
+                    f"d.`{source['time_column']}` >= :current_start",
+                    f"d.`{source['time_column']}` < :current_end",
+                ]
+                self._append_unit_condition(denominator_conditions, params, source, unit_code, f"denominator_{level}", alias="d")
+                selections.append(
+                    f"(SELECT COUNT(*) FROM `{source['table']}` AS d WHERE {' AND '.join(denominator_conditions)}) AS proportion_base_count"
+                )
             statements.append(
                 "\n".join(
                     [
-                        f"SELECT '{level_labels[level]}' AS classification_level,",
-                        f"       CAST(j.`{column}` AS CHAR) AS classification_code,",
-                        "       COUNT(*) AS event_count",
+                        ",\n       ".join(selections),
                         f"FROM `{source['table']}` AS j",
                         f"WHERE {' AND '.join(conditions)}",
                         f"GROUP BY CAST(j.`{column}` AS CHAR)",
@@ -282,4 +274,56 @@ class ReportSearchRepository:
 
         params["limit"] = query.limit + 1
         sql = "\nUNION ALL\n".join(statements) + "\nORDER BY classification_level, event_count DESC\nLIMIT :limit"
-        return [dict(row) for row in self.db.execute(text(sql), params).mappings().all()]
+        statement = text(sql)
+        executed_sql = self._render_sql(statement, params)
+        return [dict(row) for row in self.db.execute(statement, params).mappings().all()], executed_sql
+
+    @staticmethod
+    def _comparison_periods(start_time: datetime, end_time: datetime, measures: list[str]) -> dict:
+        duration = end_time - start_time
+        period_end = start_time
+        period_start = period_end - duration
+        year_start = ReportSearchRepository._shift_year(start_time)
+        year_end = ReportSearchRepository._shift_year(end_time)
+        scan_starts = [start_time]
+        if any(key in measures for key in ("year_on_year_rate", "year_on_year_change")):
+            scan_starts.append(year_start)
+        if any(key in measures for key in ("period_on_period_rate", "period_on_period_change")):
+            scan_starts.append(period_start)
+        return {
+            "current_start": start_time,
+            "current_end": end_time,
+            "year_start": year_start,
+            "year_end": year_end,
+            "period_start": period_start,
+            "period_end": period_end,
+            "scan_start": min(scan_starts),
+        }
+
+    @staticmethod
+    def _shift_year(value: datetime) -> datetime:
+        try:
+            return value.replace(year=value.year - 1)
+        except ValueError:
+            return value.replace(year=value.year - 1, day=28)
+
+    @staticmethod
+    def _append_unit_condition(
+        conditions: list[str], params: dict, source: dict, unit_code: str | None, suffix: str = "", alias: str = "j"
+    ) -> None:
+        if not unit_code:
+            return
+        param_suffix = f"_{suffix}" if suffix else ""
+        if unit_code == "330782000000":
+            name = f"unit_prefix{param_suffix}"
+            params[name] = "33078%"
+            conditions.append(f"{alias}.`{source['unit_column']}` LIKE :{name}")
+        else:
+            name = f"unit_code{param_suffix}"
+            params[name] = unit_code
+            conditions.append(f"{alias}.`{source['unit_column']}` = :{name}")
+
+    @staticmethod
+    def _render_sql(statement, params: dict) -> str:
+        bound = statement.bindparams(**params)
+        return str(bound.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))

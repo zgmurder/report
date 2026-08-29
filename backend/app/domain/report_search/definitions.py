@@ -47,15 +47,20 @@ DIMENSIONS_BY_SOURCE = {
     },
 }
 
+def _comparison_measures(event_label: str) -> dict[str, MetricDefinition]:
+    return {
+        "event_count": MetricDefinition("event_count", event_label, "COUNT(*)", "number", "当前查询时间范围内的警情数量", True),
+        "year_on_year_rate": MetricDefinition("year_on_year_rate", "同比", "", "number", "相较去年同期的增减比例"),
+        "period_on_period_rate": MetricDefinition("period_on_period_rate", "环比", "", "number", "相较上一等长周期的增减比例"),
+        "proportion": MetricDefinition("proportion", "占比", "", "number", "所选分类数量占同层级全部警情数量的比例"),
+        "year_on_year_change": MetricDefinition("year_on_year_change", "同比数", "", "number", "当前数量减去年同期数量"),
+        "period_on_period_change": MetricDefinition("period_on_period_change", "环比数", "", "number", "当前数量减上一等长周期数量"),
+    }
+
+
 MEASURES_BY_SOURCE = {
-    "jjd_jjd": {
-        "event_count": MetricDefinition("event_count", "接警总量", "COUNT(*)", "number", "符合条件的接警单数量", True),
-        "completed_count": MetricDefinition("completed_count", "反馈终结数", "SUM(CASE WHEN j.`fkzj` = 1 THEN 1 ELSE 0 END)", "number", "已反馈终结的接警数量"),
-    },
-    "fkd_fkd": {
-        "event_count": MetricDefinition("event_count", "反馈单量", "COUNT(*)", "number", "符合条件的反馈单数量", True),
-        "completed_count": MetricDefinition("completed_count", "反馈终结数", "SUM(CASE WHEN j.`fkzj` = 1 THEN 1 ELSE 0 END)", "number", "已反馈终结的反馈单数量"),
-    },
+    "jjd_jjd": _comparison_measures("接警总量"),
+    "fkd_fkd": _comparison_measures("反馈单量"),
 }
 
 

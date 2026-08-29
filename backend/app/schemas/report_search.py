@@ -74,7 +74,7 @@ class ReportSearchQuery(BaseModel):
     type_codes: list[str] = Field(default_factory=list, max_length=500)
     detail_codes: list[str] = Field(default_factory=list, max_length=500)
     dimensions: list[str] = Field(default_factory=list, max_length=3)
-    measures: list[str] = Field(default_factory=lambda: ["event_count"], min_length=1, max_length=4)
+    measures: list[str] = Field(default_factory=lambda: ["event_count"], min_length=1, max_length=6)
     limit: int = Field(default=100, ge=1, le=500)
 
     @model_validator(mode="after")
@@ -99,4 +99,5 @@ class ReportSearchResult(BaseModel):
     rows: list[dict[str, Any]]
     row_count: int
     elapsed_ms: int
+    executed_sql: str
     truncated: bool = False
