@@ -28,7 +28,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     if engine.dialect.name == "mysql":
         with engine.begin() as conn:
-            for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs", "departments"):
+            for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs", "departments", "sys_users"):
                 conn.execute(text(f"ALTER TABLE {table_name} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
             has_folder_id = conn.execute(
                 text(
@@ -38,6 +38,11 @@ def init_db() -> None:
             ).scalar()
             if not has_folder_id:
                 conn.execute(text("ALTER TABLE report_documents ADD COLUMN folder_id INT NULL AFTER report_type"))
+
+    from app.repositories.user_repository import UserRepository
+
+    with SessionLocal() as db:
+        UserRepository(db).ensure_seed_data()
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -22,27 +25,26 @@ class CurrentUser:
     unit_code: str | None = None
 
 
-def verify_password(plain_password: str, expected_password: str) -> bool:
-    """开发期轻量密码校验。
-
-    当前系统先使用环境变量中的管理员账号，避免引入重型用户/权限框架；
-    后续接入真实用户表时可在 auth service 中替换校验来源。
-    """
-    return plain_password == expected_password
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000).hex()
+    return f"pbkdf2_sha256$120000${salt}${digest}"
 
 
-def authenticate_user(username: str, password: str) -> CurrentUser | None:
-    if username != settings.admin_username:
-        return None
-    if not verify_password(password, settings.admin_password):
-        return None
-    return CurrentUser(
-        id=1,
-        username=settings.admin_username,
-        display_name=settings.admin_display_name,
-        roles=["admin"],
-        unit_code="330782000000",
-    )
+def verify_password(plain_password: str, password_hash: str) -> bool:
+    try:
+        scheme, iterations, salt, expected = password_hash.split("$", 3)
+        if scheme != "pbkdf2_sha256":
+            return False
+        digest = hashlib.pbkdf2_hmac(
+            "sha256",
+            plain_password.encode("utf-8"),
+            salt.encode("utf-8"),
+            int(iterations),
+        ).hex()
+        return hmac.compare_digest(digest, expected)
+    except (ValueError, TypeError):
+        return False
 
 
 def create_access_token(user: CurrentUser) -> str:

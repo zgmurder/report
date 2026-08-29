@@ -1,9 +1,24 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+
+
+class User(Base):
+    __tablename__ = "sys_users"
+    __table_args__ = {"mysql_charset": "utf8mb4", "mysql_collate": "utf8mb4_unicode_ci"}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(80), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    roles: Mapped[str] = mapped_column(Text, nullable=False, default="admin")
+    unit_code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="enabled", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class Department(Base):
