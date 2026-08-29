@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NCard, NForm, NFormItem, NIcon, NInput, NModal, NSpace, useMessage } from 'naive-ui'
+import { NButton, NCard, NForm, NFormItem, NIcon, NInput, NModal, NSpace, useDialog, useMessage } from 'naive-ui'
 import { FilePlus2 } from 'lucide-vue-next'
 import type { ReportItem } from '@/api/report'
 import ReportTreeSidebar from '@/components/report/ReportTreeSidebar.vue'
@@ -10,6 +10,7 @@ import { useReportStore } from '@/stores/report'
 const router = useRouter()
 const store = useReportStore()
 const message = useMessage()
+const dialog = useDialog()
 const selectedReportId = ref<number | null>(null)
 const selectedFolderId = ref<number | null>(null)
 const sidebarCollapsed = ref(false)
@@ -69,6 +70,26 @@ async function submitFolder() {
   }
 }
 
+function deleteFolder(folder: { id: number; name: string; report_count: number }) {
+  dialog.warning({
+    title: '删除目录',
+    content: folder.report_count > 0
+      ? `目录“${folder.name}”下有 ${folder.report_count} 份报告，删除后这些报告将移到未分类，确定删除吗？`
+      : `确定删除目录“${folder.name}”吗？`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await store.removeFolder(folder.id)
+        if (selectedFolderId.value === folder.id) selectedFolderId.value = null
+        message.success('目录已删除')
+      } catch {
+        message.error('删除目录失败')
+      }
+    },
+  })
+}
+
 function openReport(report: ReportItem) {
   selectedReportId.value = report.id
   router.push(`/home/editor/${report.id}`)
@@ -88,6 +109,7 @@ onMounted(load)
       @select-folder="selectedFolderId = $event"
       @open-report="openReport"
       @create-folder="createFolder"
+      @delete-folder="deleteFolder"
       @refresh="load"
       @templates="router.push('/home/templates')"
     />

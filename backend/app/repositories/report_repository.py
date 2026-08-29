@@ -93,6 +93,8 @@ class ReportRepository:
         row = self.db.get(ReportFolder, folder_id)
         if not row:
             return False
+        for child in self.db.scalars(select(ReportFolder).where(ReportFolder.parent_id == folder_id)).all():
+            child.parent_id = None
         for report in self.db.scalars(select(ReportDocument).where(ReportDocument.folder_id == folder_id)).all():
             report.folder_id = None
         self.db.delete(row)

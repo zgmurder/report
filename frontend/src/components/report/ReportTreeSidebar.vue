@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { NButton, NIcon, NTooltip, NTreeSelect } from 'naive-ui'
-import { BookOpen, FileText, FolderOpen, FolderPlus, PanelLeftClose, RefreshCw } from 'lucide-vue-next'
+import { BookOpen, FileText, FolderOpen, FolderPlus, PanelLeftClose, RefreshCw, Trash2 } from 'lucide-vue-next'
 import type { ReportFolderItem, ReportItem } from '@/api/report'
 import { useDepartmentStore } from '@/stores/department'
 
@@ -18,6 +18,7 @@ const emit = defineEmits<{
   'select-folder': [id: number | null]
   'open-report': [report: ReportItem]
   'create-folder': []
+  'delete-folder': [folder: ReportFolderItem]
   refresh: []
   templates: []
 }>()
@@ -99,18 +100,26 @@ onMounted(() => {
 
       <div class="tree">
         <div class="tree-summary">全部报告 ({{ reportCount }})</div>
-        <button
+        <div
           v-for="folder in visibleFolders"
           :key="folder.id"
           class="folder-row"
-          type="button"
           :class="{ active: selectedFolderId === folder.id }"
-          @click="chooseFolder(folder.id)"
         >
-          <n-icon :component="FolderOpen" :size="16" class="folder-icon" />
-          <span>{{ folder.name }}</span>
-          <em>{{ folder.report_count }}</em>
-        </button>
+          <button class="folder-main" type="button" @click="chooseFolder(folder.id)">
+            <n-icon :component="FolderOpen" :size="16" class="folder-icon" />
+            <span>{{ folder.name }}</span>
+            <em>{{ folder.report_count }}</em>
+          </button>
+          <n-tooltip v-if="folder.id !== 0" trigger="hover">
+            <template #trigger>
+              <n-button class="folder-delete" quaternary circle size="tiny" @click.stop="emit('delete-folder', folder)">
+                <template #icon><n-icon :component="Trash2" :size="14" /></template>
+              </n-button>
+            </template>
+            删除目录
+          </n-tooltip>
+        </div>
 
         <div v-show="folderExpanded" class="file-list">
           <button
@@ -156,10 +165,14 @@ onMounted(() => {
 .dept-wrap { padding:0 12px 12px; }
 .tree { flex:1; min-height:0; overflow:auto; padding:0 8px 12px; }
 .tree-summary { padding:6px 8px 10px; font-size:12px; color:#8c8c8c; }
-.folder-row { width:100%; border:0; background:transparent; border-radius:4px; padding:8px; display:flex; align-items:center; gap:8px; color:#262626; text-align:left; font-weight:500; }
+.folder-row { width:100%; border-radius:4px; display:flex; align-items:center; color:#262626; font-weight:500; }
 .folder-row:hover,.folder-row.active { background:#f5f5f5; }
-.folder-row span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.folder-row em { color:#8c8c8c; font-style:normal; font-size:12px; }
+.folder-main { flex:1; min-width:0; border:0; background:transparent; padding:8px; display:flex; align-items:center; gap:8px; color:inherit; text-align:left; font-weight:inherit; cursor:pointer; }
+.folder-main span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.folder-main em { color:#8c8c8c; font-style:normal; font-size:12px; }
+.folder-delete { margin-right:4px; opacity:0; color:#8c8c8c; }
+.folder-row:hover .folder-delete { opacity:1; }
+.folder-delete:hover { color:#ff4d4f; }
 .folder-icon { color:#faad14; flex-shrink:0; }
 .file-list { padding-left:8px; }
 .file-row { width:100%; border:0; background:transparent; border-radius:4px; padding:8px; display:flex; align-items:flex-start; gap:8px; text-align:left; margin-bottom:2px; }
