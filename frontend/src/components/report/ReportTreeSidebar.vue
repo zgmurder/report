@@ -41,9 +41,11 @@ const visibleFolders = computed(() =>
     ? props.folders
     : [{ id: 0, name: '未分类', parent_id: null, sort_order: 0, report_count: displayReports.value.length, created_at: '', updated_at: '' }],
 )
-const visibleReports = computed(() =>
-  props.selectedFolderId ? displayReports.value.filter((report) => report.folder_id === props.selectedFolderId) : displayReports.value,
-)
+const visibleReports = computed(() => {
+  if (props.selectedFolderId === null) return displayReports.value
+  if (props.selectedFolderId === 0) return displayReports.value.filter((report) => !report.folder_id)
+  return displayReports.value.filter((report) => report.folder_id === props.selectedFolderId)
+})
 
 function formatTime(value: string) {
   if (!value) return ''
@@ -54,10 +56,15 @@ function formatTime(value: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
+function chooseAllReports() {
+  activeTarget.value = null
+  emit('select-folder', null)
+  folderExpanded.value = true
+}
+
 function chooseFolder(id: number) {
-  const nextId = id === 0 || props.selectedFolderId === id ? null : id
   activeTarget.value = id === 0 ? null : { type: 'folder', id }
-  emit('select-folder', nextId)
+  emit('select-folder', id)
   folderExpanded.value = true
 }
 
@@ -199,12 +206,14 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="tree">
-        <div class="tree-summary">全部报告 ({{ reportCount }})</div>
+        <button class="tree-summary" type="button" :class="{ active: selectedFolderId === null && activeTarget === null }" @click="chooseAllReports">
+          全部报告 ({{ reportCount }})
+        </button>
         <div
           v-for="folder in visibleFolders"
           :key="folder.id"
           class="folder-row"
-          :class="{ active: selectedFolderId === folder.id }"
+          :class="{ active: selectedFolderId === folder.id || (activeTarget?.type === 'folder' && activeTarget.id === folder.id) }"
         >
           <div class="folder-main" role="button" tabindex="0" @click="chooseFolder(folder.id)" @keydown.enter="chooseFolder(folder.id)">
             <n-icon :component="FolderOpen" :size="16" class="folder-icon" />
@@ -249,7 +258,7 @@ onBeforeUnmount(() => {
             class="file-row"
             role="button"
             tabindex="0"
-            :class="{ active: selectedReportId === report.id }"
+            :class="{ active: selectedReportId === report.id || (activeTarget?.type === 'report' && activeTarget.id === report.id) }"
             @click="openReport(report)"
             @keydown.enter="openReport(report)"
           >
@@ -298,7 +307,8 @@ onBeforeUnmount(() => {
 .head-actions { display:flex; align-items:center; gap:2px; }
 .dept-wrap { padding:0 12px 12px; }
 .tree { flex:1; min-height:0; overflow:auto; padding:0 8px 12px; }
-.tree-summary { padding:6px 8px 10px; font-size:12px; color:#8c8c8c; }
+.tree-summary { width:100%; border:0; background:transparent; border-radius:4px; padding:6px 8px 10px; font-size:12px; color:#8c8c8c; text-align:left; cursor:pointer; }
+.tree-summary:hover,.tree-summary.active { background:#f5f5f5; color:#595959; }
 .folder-row { width:100%; border-radius:4px; display:flex; align-items:center; color:#262626; font-weight:500; }
 .folder-row:hover,.folder-row.active { background:#f5f5f5; }
 .folder-main { flex:1; min-width:0; border:0; background:transparent; padding:8px; display:flex; align-items:center; gap:8px; color:inherit; text-align:left; font-weight:inherit; cursor:pointer; }
