@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref, h } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NIcon, NInput, useDialog, useMessage } from 'naive-ui'
+import { NButton, NCard, NForm, NFormItem, NIcon, NInput, NModal, NSpace, useMessage } from 'naive-ui'
 import { FilePlus2 } from 'lucide-vue-next'
 import type { ReportItem } from '@/api/report'
 import ReportTreeSidebar from '@/components/report/ReportTreeSidebar.vue'
@@ -9,11 +9,13 @@ import { useReportStore } from '@/stores/report'
 
 const router = useRouter()
 const store = useReportStore()
-const dialog = useDialog()
 const message = useMessage()
 const selectedReportId = ref<number | null>(null)
 const selectedFolderId = ref<number | null>(null)
 const sidebarCollapsed = ref(false)
+const folderModalVisible = ref(false)
+const folderName = ref('')
+const creatingFolder = ref(false)
 
 async function load() {
   try {
@@ -39,35 +41,32 @@ async function createBlank() {
 }
 
 function createFolder() {
-  const name = ref('新建目录')
-  dialog.create({
-    title: '新建目录',
-    content: () =>
-      h(NInput, {
-        value: name.value,
-        maxlength: 40,
-        placeholder: '请输入目录名称',
-        'onUpdate:value': (value: string) => {
-          name.value = value
-        },
-      }),
-    positiveText: '创建',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      if (!name.value.trim()) {
-        message.warning('请输入目录名称')
-        return false
-      }
-      try {
-        const folder = await store.createFolder(name.value.trim())
-        selectedFolderId.value = folder.id
-        message.success('目录已创建')
-      } catch {
-        message.error('创建目录失败')
-        return false
-      }
-    },
-  })
+  folderName.value = ''
+  folderModalVisible.value = true
+}
+
+function closeFolderModal() {
+  if (creatingFolder.value) return
+  folderModalVisible.value = false
+}
+
+async function submitFolder() {
+  const name = folderName.value.trim()
+  if (!name) {
+    message.warning('请输入目录名称')
+    return
+  }
+  try {
+    creatingFolder.value = true
+    const folder = await store.createFolder(name)
+    selectedFolderId.value = folder.id
+    folderModalVisible.value = false
+    message.success('目录已创建')
+  } catch {
+    message.error('创建目录失败')
+  } finally {
+    creatingFolder.value = false
+  }
 }
 
 function openReport(report: ReportItem) {
@@ -110,6 +109,30 @@ onMounted(load)
         <p class="hint">输入或导入 docx 公共或内置模板，然后从列表中选择该模板。</p>
       </div>
     </section>
+
+    <n-modal v-model:show="folderModalVisible" :mask-closable="!creatingFolder" transform-origin="center">
+      <n-card class="folder-modal" title="新建目录" :bordered="false" role="dialog" aria-modal="true">
+        <n-form label-placement="top" @submit.prevent="submitFolder">
+          <n-form-item label="目录名称" required>
+            <n-input
+              v-model:value="folderName"
+              maxlength="40"
+              show-count
+              clearable
+              autofocus
+              placeholder="请输入目录名称"
+              @keyup.enter="submitFolder"
+            />
+          </n-form-item>
+        </n-form>
+        <template #footer>
+          <n-space justify="end">
+            <n-button :disabled="creatingFolder" @click="closeFolderModal">取消</n-button>
+            <n-button type="primary" :loading="creatingFolder" @click="submitFolder">创建</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
   </div>
 </template>
 
@@ -122,5 +145,6 @@ onMounted(load)
 .create-icon { color:#1890ff; }
 .word-badge { width:18px; height:18px; border-radius:3px; background:#2b579a; color:#fff; font-weight:700; font-size:11px; display:inline-flex; align-items:center; justify-content:center; }
 .hint { margin:0; color:#8c8c8c; font-size:13px; }
+.folder-modal { width:420px; max-width:calc(100vw - 32px); border-radius:8px; }
 @media (max-width: 900px) { .report-page { flex-direction:column; } .workspace { padding:24px; } }
 </style>
