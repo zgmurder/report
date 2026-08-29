@@ -39,14 +39,14 @@ async function createBlank() {
 }
 
 function createFolder() {
-  const name = ref('新建文件夹')
+  const name = ref('新建目录')
   dialog.create({
-    title: '新建文件夹',
+    title: '新建目录',
     content: () =>
       h(NInput, {
         value: name.value,
         maxlength: 40,
-        placeholder: '请输入文件夹名称',
+        placeholder: '请输入目录名称',
         'onUpdate:value': (value: string) => {
           name.value = value
         },
@@ -55,14 +55,15 @@ function createFolder() {
     negativeText: '取消',
     onPositiveClick: async () => {
       if (!name.value.trim()) {
-        message.warning('请输入文件夹名称')
+        message.warning('请输入目录名称')
         return false
       }
       try {
-        await store.createFolder(name.value.trim())
-        message.success('文件夹已创建')
+        const folder = await store.createFolder(name.value.trim())
+        selectedFolderId.value = folder.id
+        message.success('目录已创建')
       } catch {
-        message.error('创建文件夹失败')
+        message.error('创建目录失败')
         return false
       }
     },

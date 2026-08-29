@@ -80,7 +80,7 @@ onMounted(() => {
                 <template #icon><n-icon :component="FolderPlus" :size="16" /></template>
               </n-button>
             </template>
-            新建文件夹
+            新建目录
           </n-tooltip>
           <n-tooltip trigger="hover">
             <template #trigger>
