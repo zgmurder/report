@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { UmoEditor } from '@umoteam/editor'
 import { Node } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
 import '@umoteam/editor/style'
 import type { EditorPageConfig, ReportEditorConfig } from '@/api/report'
 import type { ReportQueryBlock } from '@/api/reportSearch'
@@ -48,18 +49,23 @@ const emit = defineEmits<{
   'update:editorConfig': [value: ReportEditorConfig]
   'update:documentJson': [value: Record<string, unknown> | null]
   save: [value: string, config: ReportEditorConfig, documentJson: Record<string, unknown> | null]
-  refreshQueryBlocks: []
+  refreshQueryBlocks: [ids?: string[]]
   queryBlockDropped: [block: ReportQueryBlock]
+  queryBlockDuplicated: [sourceId: string, duplicatedId: string]
   queryBlockIdsChanged: [ids: string[]]
 }>()
 
 const shellRef = ref<HTMLElement | null>(null)
 const umoRef = ref<UmoEditorInstance | null>(null)
+const queryBlockRegistry = new Map<string, ReportQueryBlock>()
 const restoringInitialContent = ref(true)
 const currentEditorConfig = ref<ReportEditorConfig>(normalizeEditorConfig(props.editorConfig))
 const AUTO_SAVE_DEBOUNCE_MS = 2000
 let autoSaveTimer: number | null = null
 let autoSaveSequence = 0
+let reconcilingQueryBlocks = false
+
+const REPORT_QUERY_BLOCK_MIME = 'application/vnd.yw-report-query-block+json'
 
 interface UmoEditorPayload {
   html?: string
@@ -204,11 +210,12 @@ function handleCreated() {
     applyEditorConfig()
     window.setTimeout(() => {
       const migrated = migrateLegacyQueryBlocks(props.queryBlocks)
+      const reconciled = reconcileQueryBlockNodes()
       restoringInitialContent.value = false
       nextTick(() => {
         const currentHtml = umoRef.value?.getHTML?.() || ''
         const currentJson = umoRef.value?.getJSON?.() || null
-        if (migrated) {
+        if (migrated || reconciled) {
           emit('update:modelValue', currentHtml)
           emit('update:documentJson', currentJson)
           scheduleAutoSave()
@@ -229,10 +236,6 @@ function insertContent(content: unknown, position?: number) {
     ?? false
 }
 
-function serializeQueryBlock(block: ReportQueryBlock) {
-  return JSON.stringify(block)
-}
-
 function parseQueryBlock(value: unknown): ReportQueryBlock | null {
   if (typeof value !== 'string' || !value) return null
   try {
@@ -243,13 +246,59 @@ function parseQueryBlock(value: unknown): ReportQueryBlock | null {
   }
 }
 
-function renderQueryBlockElement(block: ReportQueryBlock) {
+function resolveNodeQueryBlock(attrs: Record<string, unknown> | undefined) {
+  const blockId = typeof attrs?.blockId === 'string' ? attrs.blockId : ''
+  if (blockId && (props.queryBlocks[blockId] || queryBlockRegistry.get(blockId))) {
+    return props.queryBlocks[blockId] || queryBlockRegistry.get(blockId) || null
+  }
+  return parseQueryBlock(attrs?.blockJson)
+}
+
+function renderQueryBlockElement(
+  block: ReportQueryBlock | null,
+  attrs?: Record<string, unknown>,
+  interactive = false,
+) {
   const dom = document.createElement('div')
   dom.dataset.reportQueryNode = 'true'
-  dom.dataset.blockJson = serializeQueryBlock(block)
+  const blockId = block?.id || String(attrs?.blockId || '')
+  const mode = block?.mode || String(attrs?.mode || 'dynamic')
+  if (blockId) dom.dataset.blockId = blockId
+  dom.dataset.queryMode = mode
   dom.contentEditable = 'false'
-  dom.innerHTML = props.renderQueryBlock?.(block) || block.title
+  dom.innerHTML = block
+    ? props.renderQueryBlock?.(block) || block.title
+    : '<div style="padding:12px;color:#d03050;border:1px solid #f3c7cf;border-radius:8px;">数据块定义不存在</div>'
+  if (interactive && block?.mode === 'dynamic') {
+    dom.style.position = 'relative'
+    const refreshButton = document.createElement('button')
+    refreshButton.type = 'button'
+    refreshButton.textContent = '更新此块'
+    refreshButton.title = '按当前全局时间参数更新此数据块'
+    refreshButton.style.cssText = 'position:absolute;right:12px;bottom:12px;padding:4px 10px;border:1px solid #91caff;border-radius:4px;background:#fff;color:#1677ff;cursor:pointer;font-size:12px;'
+    refreshButton.addEventListener('mousedown', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+    })
+    refreshButton.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      emit('refreshQueryBlocks', [block.id])
+    })
+    dom.appendChild(refreshButton)
+  }
   return dom
+}
+
+function readDraggedQueryBlock(event: DragEvent) {
+  const raw = event.dataTransfer?.getData(REPORT_QUERY_BLOCK_MIME)
+  if (!raw) return null
+  try {
+    const block = JSON.parse(raw) as ReportQueryBlock
+    return block?.id && block?.query ? block : null
+  } catch {
+    return null
+  }
 }
 
 const reportQueryBlockExtension = Node.create({
@@ -260,6 +309,19 @@ const reportQueryBlockExtension = Node.create({
   draggable: true,
   addAttributes() {
     return {
+      blockId: {
+        default: '',
+        parseHTML: (element: HTMLElement) => element.dataset.blockId || '',
+      },
+      mode: {
+        default: 'dynamic',
+        parseHTML: (element: HTMLElement) => element.dataset.queryMode || 'dynamic',
+      },
+      revision: {
+        default: 0,
+        parseHTML: (element: HTMLElement) => Number(element.dataset.revision || 0),
+      },
+      // 仅用于读取早期版本保存的 Tiptap JSON；首次加载后会迁移并清空。
       blockJson: {
         default: '',
         parseHTML: (element: HTMLElement) => element.dataset.blockJson || '',
@@ -270,16 +332,12 @@ const reportQueryBlockExtension = Node.create({
     return [{ tag: 'div[data-report-query-node]' }]
   },
   renderHTML({ node }) {
-    const block = parseQueryBlock(node.attrs.blockJson)
-    return block ? renderQueryBlockElement(block) : ['div', { 'data-report-query-node': 'true' }, '数据块无效']
+    return renderQueryBlockElement(resolveNodeQueryBlock(node.attrs), node.attrs)
   },
   addNodeView() {
     return ({ node }) => {
       let currentNode = node
-      const render = () => {
-        const block = parseQueryBlock(currentNode.attrs.blockJson)
-        return block ? renderQueryBlockElement(block) : document.createElement('div')
-      }
+      const render = () => renderQueryBlockElement(resolveNodeQueryBlock(currentNode.attrs), currentNode.attrs, true)
       let dom = render()
       return {
         dom,
@@ -294,16 +352,53 @@ const reportQueryBlockExtension = Node.create({
       }
     }
   },
+  addProseMirrorPlugins() {
+    const editor = this.editor
+    return [
+      new Plugin({
+        props: {
+          handleDOMEvents: {
+            dragover(_view, event) {
+              const dragEvent = event as DragEvent
+              if (!dragEvent.dataTransfer?.types.includes(REPORT_QUERY_BLOCK_MIME)) return false
+              dragEvent.preventDefault()
+              dragEvent.dataTransfer.dropEffect = 'copy'
+              return true
+            },
+            drop(view, event) {
+              const dragEvent = event as DragEvent
+              const block = readDraggedQueryBlock(dragEvent)
+              if (!block) return false
+              dragEvent.preventDefault()
+              dragEvent.stopPropagation()
+              const position = view.posAtCoords({ left: dragEvent.clientX, top: dragEvent.clientY })?.pos
+                ?? editor.state.selection.from
+              queryBlockRegistry.set(block.id, block)
+              emit('queryBlockDropped', block)
+              return editor.commands.insertContentAt(position, [
+                {
+                  type: 'reportQueryBlock',
+                  attrs: { blockId: block.id, mode: block.mode, revision: 0, blockJson: '' },
+                },
+                { type: 'paragraph' },
+              ])
+            },
+          },
+        },
+      }),
+    ]
+  },
 })
 
 function collectQueryBlockIds(documentJson?: Record<string, unknown> | null) {
   const ids: string[] = []
   const visit = (node: unknown) => {
     if (!node || typeof node !== 'object') return
-    const value = node as { type?: string; attrs?: { blockJson?: unknown }; content?: unknown[] }
+    const value = node as { type?: string; attrs?: { blockId?: unknown; blockJson?: unknown }; content?: unknown[] }
     if (value.type === 'reportQueryBlock') {
-      const block = parseQueryBlock(value.attrs?.blockJson)
-      if (block?.id) ids.push(block.id)
+      const legacyBlock = parseQueryBlock(value.attrs?.blockJson)
+      const blockId = typeof value.attrs?.blockId === 'string' ? value.attrs.blockId : legacyBlock?.id
+      if (blockId) ids.push(blockId)
     }
     value.content?.forEach(visit)
   }
@@ -315,8 +410,66 @@ function emitQueryBlockIds(documentJson?: Record<string, unknown> | null) {
   emit('queryBlockIdsChanged', collectQueryBlockIds(documentJson || umoRef.value?.getJSON?.() || null))
 }
 
+function reconcileQueryBlockNodes() {
+  if (reconcilingQueryBlocks) return false
+  const editor = umoRef.value?.useEditor?.()
+  if (!editor?.state?.doc?.descendants || !editor.state.tr || !editor.view?.dispatch) return false
+
+  const seen = new Set<string>()
+  let transaction = editor.state.tr
+  let changed = false
+  editor.state.doc.descendants((node: any, position: number) => {
+    if (node.type?.name !== 'reportQueryBlock') return
+    const legacyBlock = parseQueryBlock(node.attrs?.blockJson)
+    let blockId = String(node.attrs?.blockId || legacyBlock?.id || '').trim()
+    const mode = node.attrs?.mode === 'snapshot' || legacyBlock?.mode === 'snapshot' ? 'snapshot' : 'dynamic'
+    if (legacyBlock) emit('queryBlockDropped', legacyBlock)
+    if (!blockId) blockId = crypto.randomUUID()
+    if (seen.has(blockId)) {
+      const sourceId = blockId
+      const duplicatedId = crypto.randomUUID()
+      const source = props.queryBlocks[sourceId] || queryBlockRegistry.get(sourceId)
+      if (source) queryBlockRegistry.set(duplicatedId, { ...source, id: duplicatedId, title: `${source.title}（副本）` })
+      emit('queryBlockDuplicated', sourceId, duplicatedId)
+      blockId = duplicatedId
+    }
+    seen.add(blockId)
+    if (
+      node.attrs?.blockId === blockId &&
+      node.attrs?.mode === mode &&
+      !node.attrs?.blockJson
+    ) return
+    transaction = transaction.setNodeMarkup(position, undefined, {
+      ...node.attrs,
+      blockId,
+      mode,
+      blockJson: '',
+    })
+    changed = true
+  })
+  if (!changed) return false
+  reconcilingQueryBlocks = true
+  editor.view.dispatch(transaction)
+  nextTick(() => {
+    reconcilingQueryBlocks = false
+    const json = umoRef.value?.getJSON?.() || null
+    emit('update:modelValue', umoRef.value?.getHTML?.() || '')
+    emit('update:documentJson', json)
+    emitQueryBlockIds(json)
+    scheduleAutoSave()
+  })
+  return true
+}
+
 function insertQueryBlockNode(block: ReportQueryBlock, position?: number) {
-  return insertContent({ type: 'reportQueryBlock', attrs: { blockJson: serializeQueryBlock(block) } }, position)
+  queryBlockRegistry.set(block.id, block)
+  return insertContent([
+    {
+      type: 'reportQueryBlock',
+      attrs: { blockId: block.id, mode: block.mode, revision: 0, blockJson: '' },
+    },
+    { type: 'paragraph' },
+  ], position)
 }
 
 function migrateLegacyQueryBlocks(blocks: Record<string, ReportQueryBlock>) {
@@ -334,7 +487,7 @@ function migrateLegacyQueryBlocks(blocks: Record<string, ReportQueryBlock>) {
     const heading = label.closest('p')
     if (!block || !heading) return
     const table = heading.nextElementSibling?.tagName === 'TABLE' ? heading.nextElementSibling : null
-    const marker = renderQueryBlockElement(block)
+    const marker = renderQueryBlockElement(block, { blockId: block.id, mode: block.mode })
     heading.replaceWith(marker)
     table?.remove()
     migrated += 1
@@ -351,10 +504,17 @@ function replaceQueryBlocks(blocks: Record<string, ReportQueryBlock>) {
   let changed = false
   editor.state.doc.descendants((node: any, position: number) => {
     if (node.type?.name !== 'reportQueryBlock') return
-    const current = parseQueryBlock(node.attrs?.blockJson)
-    const block = current?.id ? blocks[current.id] : undefined
+    const legacyBlock = parseQueryBlock(node.attrs?.blockJson)
+    const blockId = String(node.attrs?.blockId || legacyBlock?.id || '')
+    const block = blockId ? blocks[blockId] : undefined
     if (!block || block.mode !== 'dynamic') return
-    transaction = transaction.setNodeMarkup(position, undefined, { ...node.attrs, blockJson: serializeQueryBlock(block) })
+    transaction = transaction.setNodeMarkup(position, undefined, {
+      ...node.attrs,
+      blockId,
+      mode: block.mode,
+      revision: Number(node.attrs?.revision || 0) + 1,
+      blockJson: '',
+    })
     changed = true
   })
   if (!changed) return false
@@ -367,30 +527,6 @@ function replaceQueryBlocks(blocks: Record<string, ReportQueryBlock>) {
     scheduleAutoSave()
   })
   return true
-}
-
-function handleDragOver(event: DragEvent) {
-  if (event.dataTransfer?.types.includes('application/vnd.yw-report-query-block+json')) {
-    event.preventDefault()
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
-  }
-}
-
-function handleDrop(event: DragEvent) {
-  const raw = event.dataTransfer?.getData('application/vnd.yw-report-query-block+json')
-  if (!raw) return
-  event.preventDefault()
-  event.stopPropagation()
-  try {
-    const block = JSON.parse(raw) as ReportQueryBlock
-    if (!block.id || !block.query || !props.renderQueryBlock) return
-    const editor = umoRef.value?.useEditor?.()
-    const position = editor?.view?.posAtCoords?.({ left: event.clientX, top: event.clientY })?.pos
-    insertQueryBlockNode(block, position)
-    emit('queryBlockDropped', block)
-  } catch (error) {
-    console.error('动态数据块拖入失败', error)
-  }
 }
 
 function clearAutoSaveTimer() {
@@ -435,6 +571,15 @@ async function exportWord() {
 }
 
 watch(
+  () => props.queryBlocks,
+  (blocks) => {
+    queryBlockRegistry.clear()
+    Object.values(blocks).forEach((block) => queryBlockRegistry.set(block.id, block))
+  },
+  { deep: true, immediate: true },
+)
+
+watch(
   () => props.editorConfig,
   (config) => {
     currentEditorConfig.value = normalizeEditorConfig(config)
@@ -460,7 +605,13 @@ onBeforeUnmount(() => {
   clearAutoSaveTimer()
 })
 
-defineExpose({ insertContent, insertQueryBlockNode, migrateLegacyQueryBlocks, replaceQueryBlocks })
+defineExpose({
+  insertContent,
+  insertQueryBlockNode,
+  migrateLegacyQueryBlocks,
+  replaceQueryBlocks,
+  getQueryBlockIds: () => collectQueryBlockIds(umoRef.value?.getJSON?.() || null),
+})
 
 const editorOptions = computed(() => ({
   locale: 'zh-CN',
@@ -504,6 +655,7 @@ const editorOptions = computed(() => ({
       : umoRef.value?.getJSON?.() || null
     if (typeof html === 'string') emit('update:modelValue', html)
     emit('update:documentJson', documentJson)
+    if (reconcileQueryBlockNodes()) return
     emitQueryBlockIds(documentJson)
     nextTick(() => {
       updateEditorConfig()
@@ -536,7 +688,7 @@ const editorOptions = computed(() => ({
 </script>
 
 <template>
-  <div ref="shellRef" class="umo-shell" @dragover="handleDragOver" @drop="handleDrop">
+  <div ref="shellRef" class="umo-shell">
     <UmoEditor
       ref="umoRef"
       v-bind="editorOptions"

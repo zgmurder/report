@@ -31,10 +31,17 @@ const editorRef = ref<{
   insertQueryBlockNode?: (block: ReportQueryBlock, position?: number) => boolean
   migrateLegacyQueryBlocks?: (blocks: Record<string, ReportQueryBlock>) => boolean
   replaceQueryBlocks?: (blocks: Record<string, ReportQueryBlock>) => boolean
+  getQueryBlockIds?: () => string[]
 } | null>(null)
 const queryBlocks = ref<Record<string, ReportQueryBlock>>({})
+const activeQueryBlockIds = ref<string[]>([])
 const globalParameters = ref<{ start_time: string; end_time: string } | null>(null)
 const refreshingQueryBlocks = ref(false)
+let queryBlockRefreshSequence = 0
+
+const dynamicBlockCount = computed(() => activeQueryBlockIds.value.filter(
+  (id) => queryBlocks.value[id]?.mode === 'dynamic',
+).length)
 
 const title = computed(() => store.currentReport?.title || store.editingContent?.title || '未命名报告')
 
@@ -122,6 +129,9 @@ async function loadAll() {
 }
 
 async function loadCurrent() {
+  queryBlockRefreshSequence += 1
+  refreshingQueryBlocks.value = false
+  activeQueryBlockIds.value = []
   editorReady.value = false
   try {
     await store.loadReport(reportId.value)
@@ -277,12 +287,26 @@ function registerQueryBlock(block: ReportQueryBlock) {
 }
 
 function syncQueryBlockIds(ids: string[]) {
+  activeQueryBlockIds.value = [...ids]
   const activeIds = new Set(ids)
   const nextBlocks = Object.fromEntries(
     Object.entries(queryBlocks.value).filter(([id]) => activeIds.has(id)),
   )
   if (Object.keys(nextBlocks).length !== Object.keys(queryBlocks.value).length) {
     queryBlocks.value = nextBlocks
+  }
+}
+
+function duplicateQueryBlock(sourceId: string, duplicatedId: string) {
+  const source = queryBlocks.value[sourceId]
+  if (!source || queryBlocks.value[duplicatedId]) return
+  queryBlocks.value = {
+    ...queryBlocks.value,
+    [duplicatedId]: {
+      ...JSON.parse(JSON.stringify(source)) as ReportQueryBlock,
+      id: duplicatedId,
+      title: `${source.title}（副本）`,
+    },
   }
 }
 
@@ -297,23 +321,32 @@ function updateGlobalParameters(value: { start_time: string; end_time: string })
   globalParameters.value = value
 }
 
-async function refreshDynamicQueryBlocks() {
+async function refreshDynamicQueryBlocks(requestedIds?: string[]) {
   if (!globalParameters.value || refreshingQueryBlocks.value) return
-  const blocks = Object.values(queryBlocks.value).filter((block) => block.mode === 'dynamic')
+  const currentIds = editorRef.value?.getQueryBlockIds?.() || activeQueryBlockIds.value
+  syncQueryBlockIds(currentIds)
+  const requestedIdSet = requestedIds?.length ? new Set(requestedIds) : null
+  const blocks = currentIds
+    .filter((id) => !requestedIdSet || requestedIdSet.has(id))
+    .map((id) => queryBlocks.value[id])
+    .filter((block): block is ReportQueryBlock => block?.mode === 'dynamic')
   if (!blocks.length) {
     message.info('当前报告没有动态数据块')
     return
   }
+  const requestSequence = ++queryBlockRefreshSequence
   refreshingQueryBlocks.value = true
   try {
     const response = await executeReportSearchBatch(blocks.map((block) => ({
       block_id: block.id,
       query: { ...block.query, ...globalParameters.value! },
     })))
+    if (requestSequence !== queryBlockRefreshSequence) return
+    const latestIds = new Set(editorRef.value?.getQueryBlockIds?.() || activeQueryBlockIds.value)
     const nextBlocks = { ...queryBlocks.value }
     for (const item of response.items) {
       const block = nextBlocks[item.block_id]
-      if (!block) continue
+      if (!block || !latestIds.has(item.block_id)) continue
       nextBlocks[item.block_id] = {
         ...block,
         result: item.success ? item.result : block.result,
@@ -326,12 +359,15 @@ async function refreshDynamicQueryBlocks() {
     if (!updatedInEditor) {
       message.warning('数据查询已完成，但未在当前编辑器文档中找到对应动态数据块')
     } else {
-      message.success(`已更新 ${response.items.filter((item) => item.success).length} 个动态数据块`)
+      const successCount = response.items.filter((item) => item.success).length
+      message.success(requestedIdSet ? '当前动态数据块已更新' : `已更新 ${successCount} 个动态数据块`)
     }
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '动态数据更新失败')
+    if (requestSequence === queryBlockRefreshSequence) {
+      message.error(error instanceof Error ? error.message : '动态数据更新失败')
+    }
   } finally {
-    refreshingQueryBlocks.value = false
+    if (requestSequence === queryBlockRefreshSequence) refreshingQueryBlocks.value = false
   }
 }
 
@@ -395,13 +431,14 @@ onMounted(async () => {
         :title="title"
         :save-handler="save"
         :export-word-handler="exportWord"
-        :dynamic-block-count="Object.values(queryBlocks).filter((block) => block.mode === 'dynamic').length"
+        :dynamic-block-count="dynamicBlockCount"
         :refreshing-query-blocks="refreshingQueryBlocks"
         :render-query-block="renderQueryBlock"
         :query-blocks="queryBlocks"
         @save="save"
         @refresh-query-blocks="refreshDynamicQueryBlocks"
         @query-block-dropped="registerQueryBlock"
+        @query-block-duplicated="duplicateQueryBlock"
         @query-block-ids-changed="syncQueryBlockIds"
       />
     </main>
