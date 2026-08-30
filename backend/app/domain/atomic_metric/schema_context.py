@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-# 列清单对齐当前库：接警单含 zjjdbh（主单去重）；反馈单仅 jjdbh。
+# 列清单对齐当前库：
+# - 接警单：bjlbdm/bjlxdm/bjxldm + zd_bjl*dm；含 zjjdbh 主单去重
+# - 反馈单：ajlbbh/ajlxbh/ajxlbh + zd_fklbdm/zd_fklxdm/zd_fkxldm（与 jjd 不同）
 _JJD_COLUMNS = [
     {"column_name": name, "column_type": "varchar(100)", "is_nullable": "YES", "column_comment": ""}
     for name in (

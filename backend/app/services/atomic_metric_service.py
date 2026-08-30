@@ -98,6 +98,28 @@ def _pick(params: dict[str, Any], *keys: str) -> str:
     return ''
 
 
+def _classification_dim_values(
+    dim_filters: dict[str, str],
+    *,
+    category_code: str = '',
+    type_code: str = '',
+    subtype_code: str = '',
+) -> dict[str, str]:
+    """警情分类筛选 → 维度绑定值（仅非空项写入，供 _dim_where(dim_values=...) 使用）。"""
+    cat = str(category_code or '').strip()
+    typ = str(type_code or '').strip()
+    sub = str(subtype_code or '').strip()
+    values: dict[str, str] = {}
+    for param_name in dim_filters:
+        if param_name in ('ajlb', 'bjlb', 'category_code') and cat:
+            values[param_name] = cat
+        elif param_name in ('ajlx', 'bjlx', 'type_code') and typ:
+            values[param_name] = typ
+        elif param_name in ('ajxl', 'bjxl', 'subtype_code', 'feedback_subtype_code') and sub:
+            values[param_name] = sub
+    return values
+
+
 def _as_number(value: Any) -> int | float | None:
     if value is None:
         return None
@@ -459,7 +481,7 @@ class AtomicMetricService:
         include_squad_brigade = cls._is_traffic_category(merged)
         # 用户勾了占比：拆分文案用（须在总占比校验/互斥清零前记下）
         show_dim_share_pct = bool(include_share)
-        # 总占比：需有筛选维度或「重复」；已勾类别/类型/细类/社区拆分时由拆分文案带占比
+        # 总占比：需有筛选维度或「重复」；已勾类别/类型/细类/社区/时段/辖区拆分时由拆分文案带占比
         if (
             include_share
             and not has_dimension
@@ -469,6 +491,8 @@ class AtomicMetricService:
                 or include_type_share
                 or include_subtype_share
                 or include_hot_community
+                or include_hot_period
+                or include_region_table
                 or org_dimension
             )
         ):
@@ -538,30 +562,13 @@ class AtomicMetricService:
             include_share = False
 
         dept_code = _pick(merged, 'dept_code', 'deptCode')
-        # 总量实际生效的维度：拆分层互斥时清空其它层，避免拼出空 OR FIND_IN_SET
-        share_layer_count = sum(
-            1 for flag in (include_category_share, include_type_share, include_subtype_share) if flag
+        # 总量与拆分共用警情分类筛选（如选了「刑事」再按类型拆分，只统计该类别下类型）
+        total_dim_values = _classification_dim_values(
+            dim_filters,
+            category_code=category_code,
+            type_code=type_code,
+            subtype_code=subtype_code,
         )
-        total_dim_values: dict[str, str] = {}
-        for param_name in dim_filters:
-            if share_layer_count >= 2:
-                continue
-            if include_category_share:
-                if param_name in ('ajlb', 'bjlb', 'category_code') and category_code:
-                    total_dim_values[param_name] = category_code
-            elif include_type_share:
-                if param_name in ('ajlx', 'bjlx', 'type_code') and type_code:
-                    total_dim_values[param_name] = type_code
-            elif include_subtype_share:
-                if (
-                    param_name in ('ajxl', 'bjxl', 'subtype_code', 'feedback_subtype_code')
-                    and subtype_code
-                ):
-                    total_dim_values[param_name] = subtype_code
-            else:
-                value = _pick(merged, param_name) or ''
-                if value:
-                    total_dim_values[param_name] = value
 
         # 总量 SQL 只查当期；同比/环比/占比在程序侧用多次简单 COUNT 计算
         sql = AtomicMetricSql.build_total_sql(
@@ -1066,11 +1073,7 @@ class AtomicMetricService:
                 exclude_self_received=exclude_self_received,
                 extra_where=package_extra_where,
                 dept_code=dept_code,
-                dim_values=(
-                    {k: category_code for k in dim_filters if k in ('ajlb', 'bjlb', 'category_code')}
-                    if category_code
-                    else {}
-                ),
+                dim_values=total_dim_values,
                 date_end=str(date_end),
             )
             category_bind = ComponentSqlExecutor.build_bind_params(
@@ -1078,20 +1081,13 @@ class AtomicMetricService:
                     'date_start': date_start,
                     'date_end': date_end,
                     'dept_code': dept_code,
-                    **(
-                        {k: category_code for k in dim_filters if k in ('ajlb', 'bjlb', 'category_code')}
-                        if category_code
-                        else {}
-                    ),
+                    **total_dim_values,
                     **package_bind,
                 },
                 category_sql,
             )
             for param_name in dim_filters:
-                if param_name in ('ajlb', 'bjlb', 'category_code') and category_code:
-                    category_bind[param_name] = category_code
-                else:
-                    category_bind.setdefault(param_name, '')
+                category_bind.setdefault(param_name, total_dim_values.get(param_name, ''))
             category_rows = ComponentSqlExecutor.fetch_rows(
                 db, category_sql, category_bind, data_source_row=ds_row, limit=500
             )
@@ -1119,11 +1115,7 @@ class AtomicMetricService:
                     exclude_self_received=exclude_self_received,
                     extra_where=package_extra_where,
                     dept_code=dept_code,
-                    dim_values=(
-                        {k: category_code for k in dim_filters if k in ('ajlb', 'bjlb', 'category_code')}
-                        if category_code
-                        else {}
-                    ),
+                    dim_values=total_dim_values,
                     date_end=str(period_end),
                 )
                 period_bind = {**category_bind, 'date_start': period_start, 'date_end': period_end}
@@ -1220,11 +1212,7 @@ class AtomicMetricService:
                 exclude_self_received=exclude_self_received,
                 extra_where=package_extra_where,
                 dept_code=dept_code,
-                dim_values=(
-                    {k: type_code for k in dim_filters if k in ('ajlx', 'bjlx', 'type_code')}
-                    if type_code
-                    else {}
-                ),
+                dim_values=total_dim_values,
                 date_end=str(date_end),
             )
             type_bind = ComponentSqlExecutor.build_bind_params(
@@ -1232,20 +1220,13 @@ class AtomicMetricService:
                     'date_start': date_start,
                     'date_end': date_end,
                     'dept_code': dept_code,
-                    **(
-                        {k: type_code for k in dim_filters if k in ('ajlx', 'bjlx', 'type_code')}
-                        if type_code
-                        else {}
-                    ),
+                    **total_dim_values,
                     **package_bind,
                 },
                 type_sql,
             )
             for param_name in dim_filters:
-                if param_name in ('ajlx', 'bjlx', 'type_code') and type_code:
-                    type_bind[param_name] = type_code
-                else:
-                    type_bind.setdefault(param_name, '')
+                type_bind.setdefault(param_name, total_dim_values.get(param_name, ''))
             type_rows = ComponentSqlExecutor.fetch_rows(
                 db, type_sql, type_bind, data_source_row=ds_row, limit=500
             )
@@ -1269,11 +1250,7 @@ class AtomicMetricService:
                     exclude_self_received=exclude_self_received,
                     extra_where=package_extra_where,
                     dept_code=dept_code,
-                    dim_values=(
-                        {k: type_code for k in dim_filters if k in ('ajlx', 'bjlx', 'type_code')}
-                        if type_code
-                        else {}
-                    ),
+                    dim_values=total_dim_values,
                     date_end=str(period_end),
                 )
                 period_bind = {**type_bind, 'date_start': period_start, 'date_end': period_end}
@@ -1368,15 +1345,7 @@ class AtomicMetricService:
                 exclude_self_received=exclude_self_received,
                 extra_where=package_extra_where,
                 dept_code=dept_code,
-                dim_values=(
-                    {
-                        k: subtype_code
-                        for k in dim_filters
-                        if k in ('ajxl', 'bjxl', 'subtype_code', 'feedback_subtype_code')
-                    }
-                    if subtype_code
-                    else {}
-                ),
+                dim_values=total_dim_values,
                 date_end=str(date_end),
             )
             subtype_bind = ComponentSqlExecutor.build_bind_params(
@@ -1384,27 +1353,13 @@ class AtomicMetricService:
                     'date_start': date_start,
                     'date_end': date_end,
                     'dept_code': dept_code,
-                    **(
-                        {
-                            k: subtype_code
-                            for k in dim_filters
-                            if k in ('ajxl', 'bjxl', 'subtype_code', 'feedback_subtype_code')
-                        }
-                        if subtype_code
-                        else {}
-                    ),
+                    **total_dim_values,
                     **package_bind,
                 },
                 subtype_sql,
             )
             for param_name in dim_filters:
-                if (
-                    param_name in ('ajxl', 'bjxl', 'subtype_code', 'feedback_subtype_code')
-                    and subtype_code
-                ):
-                    subtype_bind[param_name] = subtype_code
-                else:
-                    subtype_bind.setdefault(param_name, '')
+                subtype_bind.setdefault(param_name, total_dim_values.get(param_name, ''))
             subtype_rows = ComponentSqlExecutor.fetch_rows(
                 db, subtype_sql, subtype_bind, data_source_row=ds_row, limit=500
             )
@@ -1432,15 +1387,7 @@ class AtomicMetricService:
                     exclude_self_received=exclude_self_received,
                     extra_where=package_extra_where,
                     dept_code=dept_code,
-                    dim_values=(
-                        {
-                            k: subtype_code
-                            for k in dim_filters
-                            if k in ('ajxl', 'bjxl', 'subtype_code', 'feedback_subtype_code')
-                        }
-                        if subtype_code
-                        else {}
-                    ),
+                    dim_values=total_dim_values,
                     date_end=str(period_end),
                 )
                 period_bind = {**subtype_bind, 'date_start': period_start, 'date_end': period_end}
@@ -1598,7 +1545,7 @@ class AtomicMetricService:
                 if not yoy_trend:
                     if org_dimension:
                         org_rows = fold_community_rows_by_org(
-                            hot_community_rows, org_type=org_dimension
+                            db, hot_community_rows, org_type=org_dimension
                         )
                         org_units_text = cls._format_hot_community_list(
                             org_rows,
@@ -1689,38 +1636,102 @@ class AtomicMetricService:
 
         hot_periods_text = None
         if include_hot_period:
-            period_sql = AtomicMetricSql.build_hot_period_sql(
-                table_name=schema.table_name,
-                time_col=time_col,
-                dept_expr=dept_expr,
-                dept_prefix_len=dept_prefix_len,
-                dim_filters=dim_filters,
-                count_id=count_id,
-                columns=columns,
-                hour_span=hot_period_hours,
+            need_period_compare = bool(
+                include_yoy or include_mom or include_yoy_count or include_mom_count
+            )
+
+            def _fetch_hot_period_rows(period_start: str, period_end: str) -> list[dict[str, Any]]:
+                period_sql = AtomicMetricSql.build_hot_period_sql(
+                    table_name=schema.table_name,
+                    time_col=time_col,
+                    dept_expr=dept_expr,
+                    dept_prefix_len=dept_prefix_len,
+                    dim_filters=dim_filters,
+                    count_id=count_id,
+                    columns=columns,
+                    hour_span=hot_period_hours,
+                    top_n=None if need_period_compare else top_n,
+                    filter_duplicate=filter_duplicate,
+                    exclude_non_police=exclude_non_police,
+                    exclude_traffic=exclude_traffic,
+                    filter_self_received=filter_self_received,
+                    exclude_self_received=exclude_self_received,
+                    extra_where=package_extra_where,
+                )
+                period_bind = ComponentSqlExecutor.build_bind_params(
+                    {
+                        'date_start': period_start,
+                        'date_end': period_end,
+                        'dept_code': _pick(merged, 'dept_code', 'deptCode'),
+                        **{k: (_pick(merged, k) or '') for k in dim_filters},
+                        **package_bind,
+                    },
+                    period_sql,
+                )
+                rows = ComponentSqlExecutor.fetch_rows(
+                    db, period_sql, period_bind, data_source_row=ds_row, limit=500
+                )
+                executed_parts.append(
+                    ComponentSqlExecutor.format_executable_sql(period_sql, period_bind)
+                )
+                return rows
+
+            period_rows = _fetch_hot_period_rows(str(date_start), str(date_end))
+            mom_map: dict[int, int] = {}
+            yoy_map: dict[int, int] = {}
+            if need_period_compare:
+                mom_start, mom_end = cls._shift_metric_period_back(str(date_start), str(date_end))
+                for row in _fetch_hot_period_rows(mom_start, mom_end):
+                    try:
+                        slot = int(float(row.get('slot_start') or 0))
+                        mom_map[slot] = int(float(row.get('total') or 0))
+                    except (TypeError, ValueError):
+                        continue
+                yoy_start = cls._shift_metric_datetime(str(date_start), years=-1)
+                yoy_end = cls._shift_metric_datetime(str(date_end), years=-1)
+                for row in _fetch_hot_period_rows(yoy_start, yoy_end):
+                    try:
+                        slot = int(float(row.get('slot_start') or 0))
+                        yoy_map[slot] = int(float(row.get('total') or 0))
+                    except (TypeError, ValueError):
+                        continue
+
+            mapped_period_rows: list[dict[str, Any]] = []
+            for row in period_rows or []:
+                try:
+                    start = int(float(row.get('slot_start') or 0))
+                except (TypeError, ValueError):
+                    continue
+                try:
+                    end = int(float(row.get('slot_end') or (start + hot_period_hours)))
+                except (TypeError, ValueError):
+                    end = start + hot_period_hours
+                try:
+                    total = int(float(row.get('total') or 0))
+                except (TypeError, ValueError):
+                    total = 0
+                if total <= 0:
+                    continue
+                mapped_period_rows.append(
+                    {
+                        'unit_name': f'{start}-{end}时',
+                        'today_cnt': total,
+                        'mom_cnt': mom_map.get(start, 0),
+                        'yoy_cnt': yoy_map.get(start, 0),
+                    }
+                )
+
+            hot_periods_text = cls._format_hot_community_list(
+                mapped_period_rows,
                 top_n=top_n,
-                filter_duplicate=filter_duplicate,
-                exclude_non_police=exclude_non_police,
-                exclude_traffic=exclude_traffic,
-                filter_self_received=filter_self_received,
-                exclude_self_received=exclude_self_received,
-                extra_where=package_extra_where,
-            )
-            period_bind = ComponentSqlExecutor.build_bind_params(
-                {
-                    'date_start': date_start,
-                    'date_end': date_end,
-                    'dept_code': _pick(merged, 'dept_code', 'deptCode'),
-                    **{k: (_pick(merged, k) or '') for k in dim_filters},
-                    **package_bind,
-                },
-                period_sql,
-            )
-            period_rows = ComponentSqlExecutor.fetch_rows(
-                db, period_sql, period_bind, data_source_row=ds_row, limit=500
-            )
-            hot_periods_text = cls._format_hot_period_list(
-                period_rows, top_n=top_n, count_threshold=count_threshold
+                include_share=show_dim_share_pct,
+                include_yoy=include_yoy,
+                include_mom=include_mom,
+                include_yoy_count=include_yoy_count,
+                include_mom_count=include_mom_count,
+                count_threshold=count_threshold,
+                sort_by=rank_sort_by,
+                sort_order=rank_sort_order,
             )
             field_values['hot_periods'] = hot_periods_text
             field_values['hot_period_hours'] = hot_period_hours
@@ -1743,12 +1754,9 @@ class AtomicMetricService:
                     'value': hot_periods_text or '无',
                 }
             )
-            top_hint = f'前{top_n}位' if top_n else ''
             text_parts.append(
-                f'高发时段({hot_period_hours}小时){top_hint} {hot_periods_text or "无"}'
-            )
-            executed_parts.append(
-                ComponentSqlExecutor.format_executable_sql(period_sql, period_bind)
+                f'{cls._format_dim_share_label(f"高发时段({hot_period_hours}小时)", include_share=show_dim_share_pct, include_yoy=include_yoy, include_mom=include_mom, include_yoy_count=include_yoy_count, include_mom_count=include_mom_count, top_n=top_n)} '
+                f'{hot_periods_text or "无"}'
             )
 
         yoy_stations = None
@@ -1840,7 +1848,7 @@ class AtomicMetricService:
                 )
                 if use_org_yoy and org_dimension:
                     analysis_rows = fold_community_rows_by_org(
-                        community_yoy_rows, org_type=org_dimension
+                        db, community_yoy_rows, org_type=org_dimension
                     )
                     trend_scope = 'org'
                     trend_unit_kind = 'community'
@@ -3831,40 +3839,69 @@ class AtomicMetricService:
         *,
         level: str,
     ) -> dict[str, str]:
-        """维度代码 → 名称：优先字典，再补类别树指定层级。"""
-        is_incident = 'jjd' in (data_source or '').lower()
-        label_map = ComponentRenderService._dict_label_map(db, 'jq_category')
-        # 反馈类别码偶发挂在 jq_type；两类字典都并入，避免 10/20 等短码落空
-        if level == 'category':
-            type_dict = ComponentRenderService._dict_label_map(db, 'jq_type')
-            for code, name in type_dict.items():
-                label_map.setdefault(code, name)
-            # 案件定性常见码兜底（与 ZD_FKLBDM 一致）
+        """维度代码 → 名称。
+
+        接警单：zd_bjlbdm / zd_bjlxdm / zd_bjxldm
+        反馈单：zd_fklbdm / zd_fklxdm / zd_fkxldm（字段 ajlbbh/ajlxbh/ajxlbh，与 jjd 不同）
+        """
+        is_jjd = 'jjd' in (data_source or '').lower()
+        if is_jjd:
+            statements = {
+                'category': (
+                    "SELECT CAST(bjlbdm AS CHAR) AS code, bjlbmc AS name "
+                    "FROM zd_bjlbdm WHERE bjlbdm IS NOT NULL AND bjlbmc IS NOT NULL"
+                ),
+                'type': (
+                    "SELECT CAST(bjlxdm AS CHAR) AS code, bjlxmc AS name "
+                    "FROM zd_bjlxdm WHERE bjlxdm IS NOT NULL AND bjlxmc IS NOT NULL"
+                ),
+                'subtype': (
+                    "SELECT CAST(bjxldm AS CHAR) AS code, bjxlmc AS name "
+                    "FROM zd_bjxldm WHERE bjxldm IS NOT NULL AND bjxlmc IS NOT NULL"
+                ),
+            }
+        else:
+            statements = {
+                'category': (
+                    "SELECT CAST(code AS CHAR) AS code, name "
+                    "FROM zd_fklbdm WHERE code <> '' AND name IS NOT NULL"
+                ),
+                'type': (
+                    "SELECT CAST(code AS CHAR) AS code, name "
+                    "FROM zd_fklxdm WHERE code <> '' AND name IS NOT NULL"
+                ),
+                'subtype': (
+                    "SELECT CAST(code AS CHAR) AS code, name "
+                    "FROM zd_fkxldm WHERE code <> '' AND name IS NOT NULL"
+                ),
+            }
+        sql = statements.get(level)
+        label_map: dict[str, str] = {}
+        if not sql:
+            return label_map
+        try:
+            rows = db.execute(text(sql)).mappings().all()
+        except Exception:
+            return label_map
+        for row in rows:
+            code = str(row.get('code') or '').strip()
+            name = str(row.get('name') or '').strip()
+            if not code or not name:
+                continue
+            label_map[code] = name
+            # 兼容去前导零 / 数值化后的码
+            stripped = code.lstrip('0')
+            if stripped and stripped != code:
+                label_map.setdefault(stripped, name)
+            try:
+                as_int = str(int(float(code)))
+                if as_int and as_int != code:
+                    label_map.setdefault(as_int, name)
+            except (TypeError, ValueError):
+                pass
+        if level == 'category' and not is_jjd:
             label_map.setdefault('10', '刑事案件')
             label_map.setdefault('20', '行政(治安)案件')
-        try:
-            tree = (
-                IncidentCategoryService.tree(db)
-                if is_incident
-                else FeedbackCategoryService.tree(db)
-            )
-        except Exception:
-            tree = []
-
-        def walk(nodes: list[Any]) -> None:
-            for node in nodes or []:
-                code = str(getattr(node, 'code', '') or '').strip()
-                name = str(getattr(node, 'name', '') or '').strip()
-                node_level = str(getattr(node, 'level', '') or '').strip()
-                # 树名称优先覆盖字典，避免短码仍显示数字
-                if code and name and node_level == level:
-                    if code not in label_map or cls._looks_like_type_code(label_map.get(code, '')):
-                        label_map[code] = name
-                children = getattr(node, 'children', None) or []
-                if children:
-                    walk(children)
-
-        walk(tree)
         return label_map
 
     @classmethod

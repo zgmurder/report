@@ -382,17 +382,22 @@ function parseNamedCountList(text: string, nameCol: string): AtomicListTable | n
 }
 
 function parseHotPeriods(text: string): AtomicListTable | null {
-  // 0-1时：12起，1-2时：8起
+  // 0-1时：12起 / 0-1时：12起（占比10%，同比上升1%）
   const parts = splitOutsideParens(text, '，,；;')
   if (!parts.length) return null
-  const rows: string[][] = []
+  const rows: Array<{ name: string; count: string; extras: CountItemExtras }> = []
   for (const part of parts) {
-    const matched = part.match(/^(\d+)\s*-\s*(\d+)\s*时\s*[：:]\s*(\d+)\s*起$/)
+    const matched = part.match(
+      /^(\d+)\s*-\s*(\d+)\s*时\s*[：:]\s*(\d+)\s*起(?:\s*[（(]\s*(.+?)\s*[）)])?\s*$/,
+    )
     if (!matched) continue
-    rows.push([`${matched[1]}-${matched[2]}时`, matched[3]])
+    rows.push({
+      name: `${matched[1]}-${matched[2]}时`,
+      count: matched[3],
+      extras: matched[4] ? parseDetailExtras(matched[4]) : {},
+    })
   }
-  if (!rows.length) return null
-  return { headers: ['时段', '数量'], rows }
+  return buildCountExtraTable('时段', rows)
 }
 
 function parseYoyStations(text: string): AtomicListTable | null {

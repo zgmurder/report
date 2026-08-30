@@ -28,8 +28,33 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     if engine.dialect.name == "mysql":
         with engine.begin() as conn:
-            for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs", "departments", "sys_users", "statistics_dictionary_exclusions"):
+            # 旧版将别名拆成第二张表；现改为 Excel 映射行与社区代码字段合并成一张表。
+            conn.execute(text("DROP TABLE IF EXISTS community_org_aliases"))
+            for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs", "departments", "sys_users", "statistics_dictionary_exclusions", "community_org_mappings"):
                 conn.execute(text(f"ALTER TABLE {table_name} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+            community_columns = {
+                "source_row": "INT NOT NULL DEFAULT 0",
+                "xzqh": "VARCHAR(12) NOT NULL DEFAULT ''",
+                "mapping_name": "VARCHAR(100) NOT NULL DEFAULT ''",
+                "match_status": "VARCHAR(20) NOT NULL DEFAULT 'unmatched'",
+            }
+            for column_name, definition in community_columns.items():
+                has_column = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'community_org_mappings' "
+                        "AND COLUMN_NAME = :column_name"
+                    ),
+                    {"column_name": column_name},
+                ).scalar()
+                if not has_column:
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE community_org_mappings "
+                            f"ADD COLUMN {column_name} {definition}"
+                        )
+                    )
+
             template_columns = {
                 "original_filename": "VARCHAR(255) NULL",
                 "file_path": "VARCHAR(500) NULL",
@@ -147,6 +172,7 @@ def init_db() -> None:
 
     with SessionLocal() as db:
         UserRepository(db).ensure_seed_data()
+        # 社区组织映射直接使用 community_org_mappings 表，不再从 Excel 灌库
 
 
 def get_db() -> Generator[Session, None, None]:

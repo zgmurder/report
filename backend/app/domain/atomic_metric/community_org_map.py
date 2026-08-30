@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import json
-from functools import lru_cache
-from pathlib import Path
 from typing import Any, Literal
+
+from sqlalchemy.orm import Session
+
+from app.repositories.community_org_repository import CommunityOrgRepository
 
 OrgDimension = Literal['pianqu', 'gongjianwei', 'jingwuqu']
 
@@ -44,15 +45,8 @@ def org_dimension_label(dim: str | None) -> str:
     return ORG_DIMENSION_LABELS.get(str(dim or '').strip(), '组织维度')
 
 
-@lru_cache(maxsize=1)
-def load_community_org_map() -> list[dict[str, Any]]:
-    path = (
-        Path(__file__).resolve().parent / 'constants' / 'community_org_map_seed.json'
-    )
-    raw = json.loads(path.read_text(encoding='utf-8'))
-    if not isinstance(raw, list):
-        return []
-    return [item for item in raw if isinstance(item, dict)]
+def load_community_org_map(db: Session) -> list[dict[str, Any]]:
+    return CommunityOrgRepository(db).list_all()
 
 
 def _index_map(items: list[dict[str, Any]], org_type: OrgDimension) -> tuple[dict[str, str], dict[str, str]]:
@@ -99,6 +93,7 @@ def resolve_org_name(
 
 
 def fold_community_rows_by_org(
+    db: Session,
     rows: list[dict[str, Any]],
     *,
     org_type: OrgDimension,
@@ -110,7 +105,7 @@ def fold_community_rows_by_org(
     - unit_code/unit_name/today_cnt/mom_cnt/yoy_cnt
     输出统一为社区同比结构，便于复用格式化与趋势逻辑。
     """
-    items = load_community_org_map()
+    items = load_community_org_map(db)
     by_code, by_name = _index_map(items, org_type)
     bucket: dict[str, dict[str, int]] = {}
     for row in rows or []:

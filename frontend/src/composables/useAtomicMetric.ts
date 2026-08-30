@@ -253,10 +253,11 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
   ] as const
 
   function resolveShareIntent() {
+    // 拆分维度只看勾选；警情分类的代码是筛选条件，不自动触发拆分
     return {
-      category: Boolean(flags.value.categoryShare || categoryCodes.value.length > 0),
-      type: Boolean(flags.value.typeShare || typeCodes.value.length > 0),
-      subtype: Boolean(flags.value.subtypeShare || subtypeCodes.value.length > 0),
+      category: Boolean(flags.value.categoryShare),
+      type: Boolean(flags.value.typeShare),
+      subtype: Boolean(flags.value.subtypeShare),
     }
   }
 
@@ -270,7 +271,6 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
         next.yoy = key === 'yoy'
         next.mom = key === 'mom'
         next.share = key === 'share'
-        if (key === 'share') next.hotPeriod = false
       } else {
         next.yoy = true
         next.mom = false
@@ -278,7 +278,6 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
       }
     } else if (key === 'share') {
       next.share = checked
-      if (checked) next.hotPeriod = false
     } else if (shareLevel && checked) {
       showOrgDimension.value = false
       orgDimension.value = ''
@@ -295,7 +294,6 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
       next.hotCommunity = key === 'hotCommunity'
       next.hotPeriod = key === 'hotPeriod'
       next.region = key === 'region'
-      if (key === 'hotPeriod') next.share = false
     } else if (key === 'selfReceived' && checked) {
       next.selfReceived = true
       next.excludeSelfReceived = false
@@ -721,12 +719,22 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
     if (flags.value.hotPeriod) {
       const hotPeriods = String(fields.hot_periods ?? result.hot_periods ?? '').trim()
       const hours = Number(fields.hot_period_hours ?? HOT_PERIOD_HOURS) || HOT_PERIOD_HOURS
+      const periodLabelPrefix = [
+        flags.value.share ? '占比' : '',
+        flags.value.momCount ? '环比数' : '',
+        flags.value.yoyCount ? '同比数' : '',
+        flags.value.yoy ? '同比' : '',
+        flags.value.mom ? '环比' : '',
+      ]
+        .filter(Boolean)
+        .join('·')
+      const labelBase = periodLabelPrefix
+        ? `${periodLabelPrefix}·高发时段(${hours}小时)`
+        : `高发时段(${hours}小时)`
       chips.push({
         field: 'hot_periods',
         label: `${
-          showRank.value && topN.value
-            ? `高发时段(${hours}小时)·前${topN.value}`
-            : `高发时段(${hours}小时)`
+          showRank.value && topN.value ? `${labelBase}·前${topN.value}` : labelBase
         }${countThresholdLabelSuffix()}`,
         value: hotPeriods || '无',
         displayValue: formatDisplay('hot_periods', hotPeriods || '无'),

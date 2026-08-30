@@ -680,34 +680,43 @@ class AtomicMetricSql:
 
     @classmethod
     def resolve_category_group_exprs(cls, columns: set[str], data_source: str) -> tuple[str, str | None]:
-        """返回 (类别代码列, 类别名称列)。反馈 ajlb 多为代码，名称走字典。"""
+        """返回 (类别代码列, 类别名称列)。
+
+        反馈单业务字段为 ajlbbh，名称走 zd_fklbdm。
+        """
         if 'jjd' in (data_source or '').lower():
             code = next((c for c in ('bjlbdm', 'bjlb') if c in columns), 'bjlbdm')
             name = next((c for c in ('bjlbmc',) if c in columns), None)
             return code, name
-        code = next((c for c in ('ajlbbh', 'ajlbdm', 'ajlb') if c in columns), 'ajlb')
+        code = next((c for c in ('ajlbbh', 'ajlbdm', 'ajlb') if c in columns), 'ajlbbh')
         name = next((c for c in ('ajlbmc',) if c in columns), None)
         return code, name
 
     @classmethod
     def resolve_type_group_exprs(cls, columns: set[str], data_source: str) -> tuple[str, str | None]:
-        """返回 (类型代码列, 类型名称列)。反馈 ajlx 多为代码，名称走字典。"""
+        """返回 (类型代码列, 类型名称列)。
+
+        反馈单业务字段为 ajlxbh（部分库也称 ajlxdm），名称走 zd_fklxdm。
+        """
         if 'jjd' in (data_source or '').lower():
             code = next((c for c in ('bjlxdm', 'bjlx') if c in columns), 'bjlxdm')
             name = next((c for c in ('bjlxmc',) if c in columns), None)
             return code, name
-        code = next((c for c in ('ajlxbh', 'ajlxdm', 'ajlx') if c in columns), 'ajlx')
+        code = next((c for c in ('ajlxbh', 'ajlxdm', 'ajlx') if c in columns), 'ajlxbh')
         name = next((c for c in ('ajlxmc',) if c in columns), None)
         return code, name
 
     @classmethod
     def resolve_subtype_group_exprs(cls, columns: set[str], data_source: str) -> tuple[str, str | None]:
-        """返回 (细类代码列, 细类名称列)。反馈 ajxl 多为代码，名称走字典。"""
+        """返回 (细类代码列, 细类名称列)。
+
+        反馈单业务字段为 ajxlbh（部分库也称 ajxldm），名称走 zd_fkxldm。
+        """
         if 'jjd' in (data_source or '').lower():
             code = next((c for c in ('bjxldm', 'bjxl') if c in columns), 'bjxldm')
             name = next((c for c in ('bjxlmc',) if c in columns), None)
             return code, name
-        code = next((c for c in ('ajxlbh', 'ajxldm', 'ajxl') if c in columns), 'ajxl')
+        code = next((c for c in ('ajxlbh', 'ajxldm', 'ajxl') if c in columns), 'ajxlbh')
         name = next((c for c in ('ajxlmc',) if c in columns), None)
         return code, name
 
@@ -1658,6 +1667,7 @@ ORDER BY today_cnt DESC, unit_name ASC""".strip()
             else:
                 dedup_key = 'NULL'
         # jz_dept 常缺交警中队编码；回退业务表单位名称（txfkdwmc 等）
+        # 各来源字段校对集可能不一致，统一 CAST+COLLATE，避免 COALESCE/MAX 报 1267
         name_fallbacks: list[str] = []
         preferred_name = {
             'txfkdwdm': 'txfkdwmc',
@@ -1668,13 +1678,21 @@ ORDER BY today_cnt DESC, unit_name ASC""".strip()
         for col in (preferred_name, 'txfkdwmc', 'fkdwmc', 'jjdwmc', 'gxdwmc'):
             if col and col in columns and col not in name_fallbacks:
                 name_fallbacks.append(col)
+
+        def _name_unicode(expr: str) -> str:
+            return f"CAST(({expr}) AS CHAR) COLLATE utf8mb4_unicode_ci"
+
         coalesce_parts = [
-            "NULLIF(TRIM(REPLACE(COALESCE(d.short_dept_name, d.detail_dept_name), '派出所', '')), '')"
+            _name_unicode(
+                "NULLIF(TRIM(REPLACE(COALESCE(d.short_dept_name, d.detail_dept_name), '派出所', '')), '')"
+            )
         ]
         for col in name_fallbacks:
             coalesce_parts.append(
-                "NULLIF(TRIM(REPLACE(REPLACE(REPLACE("
-                f"COALESCE(b.{col}, ''), '派出所', ''), '义乌', ''), '交警', '')), '')"
+                _name_unicode(
+                    "NULLIF(TRIM(REPLACE(REPLACE(REPLACE("
+                    f"COALESCE(b.{col}, ''), '派出所', ''), '义乌', ''), '交警', '')), '')"
+                )
             )
         unit_name_expr = (
             f"COALESCE({', '.join(coalesce_parts)})"
