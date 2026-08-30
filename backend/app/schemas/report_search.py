@@ -86,6 +86,15 @@ class ReportSearchQuery(BaseModel):
         return self
 
 
+class ReportSearchBatchItem(BaseModel):
+    block_id: str = Field(..., min_length=1, max_length=100)
+    query: ReportSearchQuery
+
+
+class ReportSearchBatchRequest(BaseModel):
+    items: list[ReportSearchBatchItem] = Field(..., min_length=1, max_length=50)
+
+
 class SearchResultColumn(BaseModel):
     key: str
     label: str
@@ -101,3 +110,14 @@ class ReportSearchResult(BaseModel):
     elapsed_ms: int
     executed_sql: str
     truncated: bool = False
+
+
+class ReportSearchBatchItemResult(BaseModel):
+    block_id: str
+    success: bool
+    result: ReportSearchResult | None = None
+    error: str | None = None
+
+
+class ReportSearchBatchResult(BaseModel):
+    items: list[ReportSearchBatchItemResult]

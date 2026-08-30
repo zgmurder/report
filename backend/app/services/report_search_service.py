@@ -10,6 +10,9 @@ from app.core.time import local_now
 from app.domain.report_search.definitions import DATA_SOURCES, get_dimensions, get_measures
 from app.repositories.report_search_repository import ReportSearchRepository
 from app.schemas.report_search import (
+    ReportSearchBatchItemResult,
+    ReportSearchBatchRequest,
+    ReportSearchBatchResult,
     ReportSearchQuery,
     ReportSearchResult,
     SearchClassificationItem,
@@ -106,6 +109,23 @@ class ReportSearchService:
             dimensions=[self._metric(item) for item in get_dimensions(source).values()],
             measures=[self._metric(item) for item in get_measures(source).values()],
         )
+
+    def batch_query(self, request: ReportSearchBatchRequest, current_user: CurrentUser) -> ReportSearchBatchResult:
+        items: list[ReportSearchBatchItemResult] = []
+        seen: set[str] = set()
+        for item in request.items:
+            if item.block_id in seen:
+                items.append(ReportSearchBatchItemResult(block_id=item.block_id, success=False, error="数据块编号重复"))
+                continue
+            seen.add(item.block_id)
+            try:
+                result = self.query(item.query, current_user)
+                items.append(ReportSearchBatchItemResult(block_id=item.block_id, success=True, result=result))
+            except HTTPException as exc:
+                items.append(ReportSearchBatchItemResult(block_id=item.block_id, success=False, error=str(exc.detail)))
+            except Exception:
+                items.append(ReportSearchBatchItemResult(block_id=item.block_id, success=False, error="查询执行失败"))
+        return ReportSearchBatchResult(items=items)
 
     def query(self, request: ReportSearchQuery, current_user: CurrentUser) -> ReportSearchResult:
         dimensions = get_dimensions(request.source)

@@ -9,6 +9,8 @@ import {
   NEmpty,
   NIcon,
   NModal,
+  NRadioButton,
+  NRadioGroup,
   NSelect,
   NSpace,
   NSpin,
@@ -26,14 +28,19 @@ import {
   executeReportSearch,
   getReportSearchClassifications,
   getReportSearchOptions,
+  type ReportQueryBlock,
+  type ReportQueryBlockMode,
   type SearchClassificationItem,
   type SearchOptions,
+  type SearchQuery,
   type SearchResult,
 } from '@/api/reportSearch'
 
 const emit = defineEmits<{
   generateDraft: []
   insertHtml: [html: string]
+  insertQueryBlock: [block: ReportQueryBlock]
+  globalParametersChanged: [value: { start_time: string; end_time: string }]
 }>()
 
 const message = useMessage()
@@ -50,6 +57,7 @@ const categoryCodes = ref<string[]>([])
 const typeCodes = ref<string[]>([])
 const detailCodes = ref<string[]>([])
 const selectedMeasures = ref<string[]>(['event_count'])
+const insertionMode = ref<ReportQueryBlockMode>('snapshot')
 const categories = ref<SearchClassificationItem[]>([])
 const types = ref<SearchClassificationItem[]>([])
 const details = ref<SearchClassificationItem[]>([])
@@ -334,14 +342,43 @@ function escapeHtml(value: unknown) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+function currentBlockQuery(): ReportQueryBlock['query'] {
+  return {
+    source: source.value,
+    category_codes: [...categoryCodes.value],
+    type_codes: [...typeCodes.value],
+    detail_codes: [...detailCodes.value],
+    dimensions: [],
+    measures: [...selectedMeasures.value],
+    limit: 100,
+  }
+}
+
+function createQueryBlock(): ReportQueryBlock | null {
+  if (!result.value?.rows.length) return null
+  return {
+    id: crypto.randomUUID(),
+    mode: insertionMode.value,
+    query: currentBlockQuery(),
+    title: `${result.value.source.name}统计结果`,
+    result: result.value,
+    last_updated_at: new Date().toISOString(),
+  }
+}
+
 function insertResult() {
-  if (!result.value?.rows.length) return
-  const headers = result.value.columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')
-  const rows = result.value.rows.map((row) => `<tr>${result.value!.columns.map((column) => `<td>${escapeHtml(row[column.key])}</td>`).join('')}</tr>`).join('')
-  const [start, end] = range.value || []
-  const timeLabel = start && end ? `${toLocalDateTime(start).replace('T', ' ')} 至 ${toLocalDateTime(end).replace('T', ' ')}` : ''
-  emit('insertHtml', `<h3>${escapeHtml(result.value.source.name)}统计结果</h3><p>统计时间：${escapeHtml(timeLabel)}；统计部门：${escapeHtml(result.value.department.name)}</p><table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table><p></p>`)
-  message.success('查询结果已插入报告')
+  const block = createQueryBlock()
+  if (!block) return
+  emit('insertQueryBlock', block)
+  message.success(block.mode === 'dynamic' ? '动态数据块已插入报告' : '查询结果已插入报告')
+}
+
+function handleResultDragStart(event: DragEvent) {
+  const block = createQueryBlock()
+  if (!block || !event.dataTransfer) return
+  event.dataTransfer.effectAllowed = 'copy'
+  event.dataTransfer.setData('application/vnd.yw-report-query-block+json', JSON.stringify(block))
+  event.dataTransfer.setData('text/plain', block.title)
 }
 
 function resetSearch() {
@@ -375,7 +412,14 @@ watch(source, async () => {
   persistGlobalParameters()
   await loadAllClassifications().catch(() => message.error('查询配置加载失败'))
 })
-watch([range, activeTimePreset], persistGlobalParameters, { deep: true })
+watch([range, activeTimePreset], () => {
+  persistGlobalParameters()
+  if (!settingsReady.value || !range.value) return
+  emit('globalParametersChanged', {
+    start_time: toLocalDateTime(range.value[0]),
+    end_time: toLocalDateTime(range.value[1]),
+  })
+}, { deep: true })
 watch([categoryCodes, typeCodes, detailCodes], () => {
   if (!hasClassificationSelection.value) {
     selectedMeasures.value = selectedMeasures.value.filter((key) => key !== 'proportion')
@@ -392,6 +436,12 @@ onMounted(async () => {
   }
   await loadOptions()
   settingsReady.value = true
+  if (range.value) {
+    emit('globalParametersChanged', {
+      start_time: toLocalDateTime(range.value[0]),
+      end_time: toLocalDateTime(range.value[1]),
+    })
+  }
   await loadAllClassifications().catch(() => message.error('分类字典加载失败'))
   window.addEventListener('statistics-dictionary-updated', reloadClassificationOptions)
 })
@@ -486,7 +536,13 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
                 <span v-if="result" class="result-meta">{{ result.row_count }} 行 · {{ result.elapsed_ms }} ms</span>
               </div>
               <n-alert v-if="result?.truncated" type="warning" :show-icon="false" class="result-alert">结果超过 100 行，仅展示前 100 行</n-alert>
-              <div v-if="result?.rows.length" class="result-output">
+              <div
+                v-if="result?.rows.length"
+                class="result-output"
+                draggable="true"
+                title="可将查询结果拖入编辑器"
+                @dragstart="handleResultDragStart"
+              >
                 <div v-if="totalMetrics.length" class="total-statistic-wrap">
                   <div class="total-metrics">
                     <n-statistic
@@ -522,9 +578,16 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
                     </div>
                   </div>
                 </div>
+                <div class="insert-controls">
+                  <n-radio-group v-model:value="insertionMode" size="small">
+                    <n-radio-button value="snapshot">正常内容</n-radio-button>
+                    <n-radio-button value="dynamic">模板占位</n-radio-button>
+                  </n-radio-group>
+                  <div class="field-hint">可拖动整个结果区域到编辑器指定位置</div>
+                </div>
                 <n-button secondary type="primary" block class="insert-button" @click="insertResult">
                   <template #icon><n-icon :component="FileInput" /></template>
-                  插入报告
+                  {{ insertionMode === 'dynamic' ? '插入动态数据块' : '插入查询结果' }}
                 </n-button>
               </div>
               <n-empty v-else :description="result ? '当前条件统计数量为 0' : '设置参数并执行查询'" size="small" class="result-empty" />
@@ -585,7 +648,9 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
 .metric-options :deep(.n-checkbox__label) { padding-left: 5px; font-size: 12px; }
 .result-meta { color: #909399; font-size: 11px; font-weight: 400; }
 .result-alert { margin-bottom: 8px; font-size: 11px; }
-.result-output { min-width: 0; }
+.result-output { min-width: 0; cursor: grab; }
+.result-output:active { cursor: grabbing; }
+.insert-controls { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .total-statistic-wrap { position: relative; padding: 14px 54px 14px 12px; border: 1px solid #d9e9fb; border-radius: 8px; background: #f5faff; }
 .total-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 8px; }
 .total-statistic { min-width: 0; text-align: center; }

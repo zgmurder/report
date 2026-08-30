@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NCard, NForm, NFormItem, NInput, NModal, NSpace, useDialog, useMessage } from 'naive-ui'
 import { downloadReportDocx, type ReportContent, type ReportEditorConfig, type ReportFolderItem, type ReportItem } from '@/api/report'
+import { executeReportSearchBatch, type ReportQueryBlock } from '@/api/reportSearch'
 import ReportAssistantSidebar from '@/components/editor/ReportAssistantSidebar.vue'
 import ReportUmoEditor from '@/components/editor/ReportUmoEditor.vue'
 import ReportTreeSidebar from '@/components/report/ReportTreeSidebar.vue'
@@ -25,6 +26,15 @@ const folderSubmitting = ref(false)
 const editorConfig = ref<ReportEditorConfig>(createDefaultEditorConfig())
 const editorVersion = ref(0)
 const editorReady = ref(false)
+const editorRef = ref<{
+  insertContent?: (content: string, position?: number) => boolean
+  insertQueryBlockNode?: (block: ReportQueryBlock, position?: number) => boolean
+  migrateLegacyQueryBlocks?: (blocks: Record<string, ReportQueryBlock>) => boolean
+  replaceQueryBlocks?: (blocks: Record<string, ReportQueryBlock>) => boolean
+} | null>(null)
+const queryBlocks = ref<Record<string, ReportQueryBlock>>({})
+const globalParameters = ref<{ start_time: string; end_time: string } | null>(null)
+const refreshingQueryBlocks = ref(false)
 
 const title = computed(() => store.currentReport?.title || store.editingContent?.title || '未命名报告')
 
@@ -89,7 +99,10 @@ function buildReportContent(value: string, editorDocument = documentJson.value):
     type: 'html',
     params: {
       ...(store.editingContent?.params || {}),
+      schema_version: 2,
       editor_document: editorDocument,
+      global_parameters: globalParameters.value,
+      query_blocks: queryBlocks.value,
     },
     sections: [{ id: 'umo_content', title: '报告正文', type: 'html', content: value, blocks: [], source: [], ai_generated: false }],
   }
@@ -116,6 +129,14 @@ async function loadCurrent() {
     editorConfig.value = store.editorConfig || createDefaultEditorConfig()
     const savedDocument = store.editingContent?.params?.editor_document
     documentJson.value = cloneEditorDocument(savedDocument)
+    const savedBlocks = store.editingContent?.params?.query_blocks
+    queryBlocks.value = savedBlocks && typeof savedBlocks === 'object'
+      ? JSON.parse(JSON.stringify(savedBlocks)) as Record<string, ReportQueryBlock>
+      : {}
+    const savedGlobalParameters = store.editingContent?.params?.global_parameters
+    globalParameters.value = savedGlobalParameters && typeof savedGlobalParameters === 'object'
+      ? JSON.parse(JSON.stringify(savedGlobalParameters)) as { start_time: string; end_time: string }
+      : null
     html.value = resolveEditorHtml(store.currentReport, store.editingContent)
     if (isBlankHtml(html.value)) {
       html.value = `<h1 style="text-align:center;">${escapeHtml(title.value)}</h1><p></p>`
@@ -240,6 +261,80 @@ function insertHtml(fragment: string) {
   html.value = `${html.value || ''}${fragment}`
 }
 
+function renderQueryBlock(block: ReportQueryBlock) {
+  const result = block.result
+  const modeLabel = block.mode === 'dynamic' ? '动态数据' : '静态数据'
+  const status = block.error
+    ? `<div style="color:#d03050;padding:8px 0;">更新失败：${escapeHtml(block.error)}</div>`
+    : result?.rows.length
+      ? `<table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(String(row[column.key] ?? '—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+      : '<div style="color:#909399;padding:8px 0;">暂无数据</div>'
+  return `<div data-report-query-block="${escapeHtml(block.id)}" data-query-mode="${block.mode}" contenteditable="false" style="margin:12px 0;padding:12px;border:1px solid #d9e9fb;border-radius:8px;background:#f8fbff;"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><strong>${escapeHtml(block.title)}</strong><span style="color:#1890ff;font-size:12px;">${modeLabel}</span></div>${status}</div><p></p>`
+}
+
+function registerQueryBlock(block: ReportQueryBlock) {
+  queryBlocks.value = { ...queryBlocks.value, [block.id]: block }
+}
+
+function syncQueryBlockIds(ids: string[]) {
+  const activeIds = new Set(ids)
+  const nextBlocks = Object.fromEntries(
+    Object.entries(queryBlocks.value).filter(([id]) => activeIds.has(id)),
+  )
+  if (Object.keys(nextBlocks).length !== Object.keys(queryBlocks.value).length) {
+    queryBlocks.value = nextBlocks
+  }
+}
+
+function insertQueryBlock(block: ReportQueryBlock) {
+  registerQueryBlock(block)
+  if (!editorRef.value?.insertQueryBlockNode?.(block)) {
+    message.error('数据块插入失败，请刷新页面后重试')
+  }
+}
+
+function updateGlobalParameters(value: { start_time: string; end_time: string }) {
+  globalParameters.value = value
+}
+
+async function refreshDynamicQueryBlocks() {
+  if (!globalParameters.value || refreshingQueryBlocks.value) return
+  const blocks = Object.values(queryBlocks.value).filter((block) => block.mode === 'dynamic')
+  if (!blocks.length) {
+    message.info('当前报告没有动态数据块')
+    return
+  }
+  refreshingQueryBlocks.value = true
+  try {
+    const response = await executeReportSearchBatch(blocks.map((block) => ({
+      block_id: block.id,
+      query: { ...block.query, ...globalParameters.value! },
+    })))
+    const nextBlocks = { ...queryBlocks.value }
+    for (const item of response.items) {
+      const block = nextBlocks[item.block_id]
+      if (!block) continue
+      nextBlocks[item.block_id] = {
+        ...block,
+        result: item.success ? item.result : block.result,
+        error: item.success ? null : item.error || '查询失败',
+        last_updated_at: item.success ? new Date().toISOString() : block.last_updated_at,
+      }
+    }
+    queryBlocks.value = nextBlocks
+    const updatedInEditor = editorRef.value?.replaceQueryBlocks?.(nextBlocks) ?? false
+    if (!updatedInEditor) {
+      message.warning('数据查询已完成，但未在当前编辑器文档中找到对应动态数据块')
+    } else {
+      message.success(`已更新 ${response.items.filter((item) => item.success).length} 个动态数据块`)
+    }
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '动态数据更新失败')
+  } finally {
+    refreshingQueryBlocks.value = false
+  }
+}
+
 async function save(value = html.value, config = editorConfig.value, editorDocument = documentJson.value) {
   editorConfig.value = config
   documentJson.value = editorDocument
@@ -292,6 +387,7 @@ onMounted(async () => {
     <main class="editor-center">
       <ReportUmoEditor
         v-if="editorReady"
+        ref="editorRef"
         :key="`${reportId}-${editorVersion}`"
         v-model="html"
         v-model:document-json="documentJson"
@@ -299,13 +395,22 @@ onMounted(async () => {
         :title="title"
         :save-handler="save"
         :export-word-handler="exportWord"
+        :dynamic-block-count="Object.values(queryBlocks).filter((block) => block.mode === 'dynamic').length"
+        :refreshing-query-blocks="refreshingQueryBlocks"
+        :render-query-block="renderQueryBlock"
+        :query-blocks="queryBlocks"
         @save="save"
+        @refresh-query-blocks="refreshDynamicQueryBlocks"
+        @query-block-dropped="registerQueryBlock"
+        @query-block-ids-changed="syncQueryBlockIds"
       />
     </main>
 
     <ReportAssistantSidebar
       @generate-draft="generateDraft"
       @insert-html="insertHtml"
+      @insert-query-block="insertQueryBlock"
+      @global-parameters-changed="updateGlobalParameters"
     />
 
     <n-modal v-model:show="folderModalVisible" :mask-closable="!folderSubmitting" transform-origin="center">

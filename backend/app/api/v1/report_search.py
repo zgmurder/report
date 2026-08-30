@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.core.response import ok
 from app.core.security import CurrentUser, get_current_user
 from app.repositories.report_search_repository import ReportSearchRepository
-from app.schemas.report_search import ReportSearchQuery, StatisticsDictionaryConfigUpdate
+from app.schemas.report_search import ReportSearchBatchRequest, ReportSearchQuery, StatisticsDictionaryConfigUpdate
 from app.services.report_search_service import ReportSearchService
 
 router = APIRouter()
@@ -56,6 +56,15 @@ def search_metrics(
     service: ReportSearchService = Depends(get_service),
 ):
     return ok(service.metrics(source))
+
+
+@router.post("/batch-query")
+def execute_batch_search(
+    request: ReportSearchBatchRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    service: ReportSearchService = Depends(get_service),
+):
+    return ok(service.batch_query(request, current_user))
 
 
 @router.post("/query")

@@ -77,6 +77,18 @@ export interface SearchResultColumn {
   type: 'text' | 'number' | 'datetime'
 }
 
+export type ReportQueryBlockMode = 'snapshot' | 'dynamic'
+
+export interface ReportQueryBlock {
+  id: string
+  mode: ReportQueryBlockMode
+  query: Omit<SearchQuery, 'start_time' | 'end_time'>
+  title: string
+  result?: SearchResult | null
+  last_updated_at?: string | null
+  error?: string | null
+}
+
 export interface SearchResult {
   source: SearchDataSource
   department: SearchDepartment
@@ -121,4 +133,15 @@ export function getReportSearchMetrics(source = 'jjd_jjd') {
 
 export function executeReportSearch(data: SearchQuery) {
   return apiPost<SearchResult>('/report-search/query', data)
+}
+
+export interface BatchSearchItemResult {
+  block_id: string
+  success: boolean
+  result?: SearchResult | null
+  error?: string | null
+}
+
+export function executeReportSearchBatch(items: Array<{ block_id: string; query: SearchQuery }>) {
+  return apiPost<{ items: BatchSearchItemResult[] }>('/report-search/batch-query', { items })
 }
