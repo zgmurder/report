@@ -56,6 +56,13 @@ const details = ref<SearchClassificationItem[]>([])
 const loadingClassifications = ref(false)
 const result = ref<SearchResult | null>(null)
 const showSql = ref(false)
+const settingsReady = ref(false)
+
+interface CachedGlobalParameters {
+  source: 'jjd_jjd' | 'fkd_fkd'
+  range: [number, number]
+  activeTimePreset: string
+}
 
 const currentUnitCode = computed(() => {
   const configured = userStore.user?.unit_code
@@ -136,6 +143,49 @@ function defaultTimeRange(): [number, number] {
   return [addDays(today, -1).getTime(), today.getTime()]
 }
 
+function globalParametersCacheKey() {
+  const identity = userStore.user?.id || userStore.user?.username || 'anonymous'
+  return `report_search_global_parameters:${identity}`
+}
+
+function readCachedGlobalParameters(): CachedGlobalParameters | null {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(globalParametersCacheKey()) || 'null') as Partial<CachedGlobalParameters> | null
+    if (!parsed || !['jjd_jjd', 'fkd_fkd'].includes(String(parsed.source))) return null
+    if (!Array.isArray(parsed.range) || parsed.range.length !== 2 || !parsed.range.every(Number.isFinite)) return null
+    if (parsed.range[1]! <= parsed.range[0]!) return null
+    return {
+      source: parsed.source as CachedGlobalParameters['source'],
+      range: [parsed.range[0]!, parsed.range[1]!],
+      activeTimePreset: typeof parsed.activeTimePreset === 'string' ? parsed.activeTimePreset : '',
+    }
+  } catch {
+    localStorage.removeItem(globalParametersCacheKey())
+    return null
+  }
+}
+
+function persistGlobalParameters() {
+  if (!settingsReady.value || !range.value || !options.value) return
+  const defaultRange: [number, number] = [
+    toTimestamp(options.value.default_start_time),
+    toTimestamp(options.value.default_end_time),
+  ]
+  const isDefault = source.value === 'jjd_jjd'
+    && activeTimePreset.value === 'yesterday'
+    && range.value[0] === defaultRange[0]
+    && range.value[1] === defaultRange[1]
+  if (isDefault) {
+    localStorage.removeItem(globalParametersCacheKey())
+    return
+  }
+  localStorage.setItem(globalParametersCacheKey(), JSON.stringify({
+    source: source.value,
+    range: range.value,
+    activeTimePreset: activeTimePreset.value,
+  } satisfies CachedGlobalParameters))
+}
+
 function lunarNewYear(year: number) {
   const formatter = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { month: 'numeric', day: 'numeric' })
   for (let date = new Date(year, 0, 15); date <= new Date(year, 2, 1); date = addDays(date, 1)) {
@@ -209,8 +259,17 @@ async function loadOptions() {
   loadingOptions.value = true
   try {
     options.value = await getReportSearchOptions()
-    range.value = [toTimestamp(options.value.default_start_time), toTimestamp(options.value.default_end_time)]
-    activeTimePreset.value = 'yesterday'
+    const cached = readCachedGlobalParameters()
+    const enabledSources = new Set(options.value.data_sources.filter((item) => item.enabled).map((item) => item.key))
+    if (cached && enabledSources.has(cached.source)) {
+      source.value = cached.source
+      range.value = cached.range
+      activeTimePreset.value = cached.activeTimePreset
+    } else {
+      source.value = 'jjd_jjd'
+      range.value = [toTimestamp(options.value.default_start_time), toTimestamp(options.value.default_end_time)]
+      activeTimePreset.value = 'yesterday'
+    }
   } catch (error) {
     message.error(error instanceof Error ? error.message : '搜索配置加载失败')
   } finally {
@@ -286,6 +345,8 @@ function insertResult() {
 }
 
 function resetSearch() {
+  localStorage.removeItem(globalParametersCacheKey())
+  source.value = 'jjd_jjd'
   categoryCodes.value = []
   selectedMeasures.value = ['event_count']
   typeCodes.value = []
@@ -306,12 +367,15 @@ async function reloadClassificationOptions() {
 }
 
 watch(source, async () => {
+  if (!settingsReady.value) return
   categoryCodes.value = []
   typeCodes.value = []
   detailCodes.value = []
   result.value = null
+  persistGlobalParameters()
   await loadAllClassifications().catch(() => message.error('查询配置加载失败'))
 })
+watch([range, activeTimePreset], persistGlobalParameters, { deep: true })
 watch([categoryCodes, typeCodes, detailCodes], () => {
   if (!hasClassificationSelection.value) {
     selectedMeasures.value = selectedMeasures.value.filter((key) => key !== 'proportion')
@@ -327,6 +391,7 @@ onMounted(async () => {
     await departmentStore.loadDepartmentTree().catch(() => undefined)
   }
   await loadOptions()
+  settingsReady.value = true
   await loadAllClassifications().catch(() => message.error('分类字典加载失败'))
   window.addEventListener('statistics-dictionary-updated', reloadClassificationOptions)
 })

@@ -156,7 +156,7 @@ class ReportSearchRepository:
         source = SOURCE_CONFIG[query.source]
         dimensions = [get_dimensions(query.source)[key] for key in query.dimensions]
         selections = [f"{item.expression} AS `{item.key}`" for item in dimensions]
-        selections.append("COUNT(*) AS `event_count`")
+        selections.append(f"{self._count_expression(source)} AS `event_count`")
         conditions = [
             f"j.`{source['time_column']}` >= :start_time",
             f"j.`{source['time_column']}` < :end_time",
@@ -185,17 +185,17 @@ class ReportSearchRepository:
         ]
         self._append_unit_condition(conditions, params, source, unit_code)
         selections = [
-            f"SUM(CASE WHEN j.`{source['time_column']}` >= :current_start AND j.`{source['time_column']}` < :current_end THEN 1 ELSE 0 END) AS event_count"
+            f"{self._period_count_expression(source, ':current_start', ':current_end')} AS event_count"
         ]
         if any(key in query.measures for key in ("year_on_year_rate", "year_on_year_change")):
             params.update(year_start=periods["year_start"], year_end=periods["year_end"])
             selections.append(
-                f"SUM(CASE WHEN j.`{source['time_column']}` >= :year_start AND j.`{source['time_column']}` < :year_end THEN 1 ELSE 0 END) AS year_base_count"
+                f"{self._period_count_expression(source, ':year_start', ':year_end')} AS year_base_count"
             )
         if any(key in query.measures for key in ("period_on_period_rate", "period_on_period_change")):
             params.update(period_start=periods["period_start"], period_end=periods["period_end"])
             selections.append(
-                f"SUM(CASE WHEN j.`{source['time_column']}` >= :period_start AND j.`{source['time_column']}` < :period_end THEN 1 ELSE 0 END) AS period_base_count"
+                f"{self._period_count_expression(source, ':period_start', ':period_end')} AS period_base_count"
             )
         sql = "\n".join(
             [
@@ -242,15 +242,15 @@ class ReportSearchRepository:
             selections = [
                 f"SELECT '{level_labels[level]}' AS classification_level",
                 f"CAST(j.`{column}` AS CHAR) AS classification_code",
-                f"SUM(CASE WHEN j.`{source['time_column']}` >= :current_start AND j.`{source['time_column']}` < :current_end THEN 1 ELSE 0 END) AS event_count",
+                f"{self._period_count_expression(source, ':current_start', ':current_end')} AS event_count",
             ]
             if any(key in query.measures for key in ("year_on_year_rate", "year_on_year_change")):
                 selections.append(
-                    f"SUM(CASE WHEN j.`{source['time_column']}` >= :year_start AND j.`{source['time_column']}` < :year_end THEN 1 ELSE 0 END) AS year_base_count"
+                    f"{self._period_count_expression(source, ':year_start', ':year_end')} AS year_base_count"
                 )
             if any(key in query.measures for key in ("period_on_period_rate", "period_on_period_change")):
                 selections.append(
-                    f"SUM(CASE WHEN j.`{source['time_column']}` >= :period_start AND j.`{source['time_column']}` < :period_end THEN 1 ELSE 0 END) AS period_base_count"
+                    f"{self._period_count_expression(source, ':period_start', ':period_end')} AS period_base_count"
                 )
             if "proportion" in query.measures:
                 denominator_conditions = [
@@ -259,7 +259,7 @@ class ReportSearchRepository:
                 ]
                 self._append_unit_condition(denominator_conditions, params, source, unit_code, f"denominator_{level}", alias="d")
                 selections.append(
-                    f"(SELECT COUNT(*) FROM `{source['table']}` AS d WHERE {' AND '.join(denominator_conditions)}) AS proportion_base_count"
+                    f"(SELECT {self._count_expression(source, alias='d')} FROM `{source['table']}` AS d WHERE {' AND '.join(denominator_conditions)}) AS proportion_base_count"
                 )
             statements.append(
                 "\n".join(
@@ -277,6 +277,24 @@ class ReportSearchRepository:
         statement = text(sql)
         executed_sql = self._render_sql(statement, params)
         return [dict(row) for row in self.db.execute(statement, params).mappings().all()], executed_sql
+
+    @staticmethod
+    def _count_expression(source: dict, alias: str = "j") -> str:
+        deduplicate_column = source.get("deduplicate_column")
+        if deduplicate_column:
+            return f"COUNT(DISTINCT {alias}.`{deduplicate_column}`)"
+        return "COUNT(*)"
+
+    @staticmethod
+    def _period_count_expression(source: dict, start_param: str, end_param: str, alias: str = "j") -> str:
+        condition = (
+            f"{alias}.`{source['time_column']}` >= {start_param} "
+            f"AND {alias}.`{source['time_column']}` < {end_param}"
+        )
+        deduplicate_column = source.get("deduplicate_column")
+        if deduplicate_column:
+            return f"COUNT(DISTINCT CASE WHEN {condition} THEN {alias}.`{deduplicate_column}` END)"
+        return f"SUM(CASE WHEN {condition} THEN 1 ELSE 0 END)"
 
     @staticmethod
     def _comparison_periods(start_time: datetime, end_time: datetime, measures: list[str]) -> dict:

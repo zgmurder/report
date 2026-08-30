@@ -32,6 +32,7 @@ SOURCE_CONFIG = {
         "category_column": "ajlbbh",
         "type_column": "ajlxbh",
         "detail_column": "ajxlbh",
+        "deduplicate_column": "jjdbh",
     },
 }
 
