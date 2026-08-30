@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import re
+import zipfile
 from html import escape
 from pathlib import Path
 from uuid import uuid4
@@ -11,8 +13,12 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from fastapi import HTTPException, UploadFile, status
 
-ALLOWED_WORD_SUFFIXES = {".doc", ".docx"}
+ALLOWED_WORD_SUFFIXES = {".docx"}
 MAX_WORD_FILE_SIZE = 20 * 1024 * 1024
+MAX_ZIP_ENTRIES = 2000
+MAX_ZIP_ENTRY_SIZE = 50 * 1024 * 1024
+MAX_ZIP_TOTAL_SIZE = 200 * 1024 * 1024
+DOCX_REQUIRED_ENTRIES = {"[Content_Types].xml", "word/document.xml"}
 
 
 class TemplateFileService:
@@ -25,7 +31,7 @@ class TemplateFileService:
         if suffix not in ALLOWED_WORD_SUFFIXES:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="仅支持 .doc 或 .docx 格式的 Word 文件",
+                detail="仅支持 .docx 格式；旧版 .doc 无法安全解析，请另存为 .docx 后上传",
             )
 
         content = await upload.read(MAX_WORD_FILE_SIZE + 1)
@@ -33,6 +39,7 @@ class TemplateFileService:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="上传文件不能为空")
         if len(content) > MAX_WORD_FILE_SIZE:
             raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Word 文件不能超过 20MB")
+        self._validate_docx(content)
 
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         safe_stem = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_-]+", "_", Path(original_filename).stem).strip("_") or "template"
@@ -51,32 +58,61 @@ class TemplateFileService:
         }
 
     @staticmethod
-    def delete(file_path: str | None) -> None:
+    def _validate_docx(content: bytes) -> None:
+        if not content.startswith(b"PK"):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="文件不是有效的 DOCX（ZIP 签名错误）")
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                entries = archive.infolist()
+                if len(entries) > MAX_ZIP_ENTRIES:
+                    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="DOCX 内部条目过多")
+                names = {entry.filename for entry in entries}
+                if not DOCX_REQUIRED_ENTRIES.issubset(names):
+                    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="DOCX 缺少必需文档条目")
+                total = 0
+                for entry in entries:
+                    if entry.file_size > MAX_ZIP_ENTRY_SIZE:
+                        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="DOCX 单个解压条目过大")
+                    total += entry.file_size
+                    if total > MAX_ZIP_TOTAL_SIZE:
+                        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="DOCX 解压后总体积过大")
+                    if entry.compress_size > 0 and entry.file_size / entry.compress_size > 1000:
+                        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="DOCX 压缩比异常")
+        except zipfile.BadZipFile as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="文件不是有效的 DOCX 压缩包") from exc
+
+    def delete(self, file_path: str | None) -> None:
         if not file_path:
             return
+        path = self._resolve_storage_path(file_path)
         try:
-            Path(file_path).unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
         except OSError:
             pass
 
-    @staticmethod
-    def read(file_path: str | None) -> bytes:
-        path = TemplateFileService._require_file(file_path)
+    def read(self, file_path: str | None) -> bytes:
+        path = self._require_file(file_path)
         try:
-            return path.read_bytes()
+            content = path.read_bytes()
         except OSError as exc:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="模板文件读取失败") from exc
+        if len(content) > MAX_WORD_FILE_SIZE:
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Word 文件不能超过 20MB")
+        self._validate_docx(content)
+        return content
 
-    @staticmethod
-    def extract_html(file_path: str | None) -> str:
-        path = TemplateFileService._require_file(file_path)
+    def extract_html(self, file_path: str | None) -> str:
+        path = self._require_file(file_path)
         if path.suffix.lower() != ".docx":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="编辑器加载内容暂只支持 .docx 格式，请将旧版 .doc 文件另存为 .docx 后重新上传",
             )
+        # Re-read and validate historical files before handing them to
+        # python-docx so old database paths cannot bypass ZIP resource limits.
+        content = self.read(file_path)
         try:
-            document = Document(path)
+            document = Document(io.BytesIO(content))
         except Exception as exc:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Word 模板内容解析失败") from exc
 
@@ -236,11 +272,25 @@ class TemplateFileService:
         }
         return colors.get(str(value))
 
-    @staticmethod
-    def _require_file(file_path: str | None) -> Path:
+    def _resolve_storage_path(self, file_path: str) -> Path:
+        root = self.storage_dir.resolve()
+        candidate = Path(file_path)
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        resolved = candidate.resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="模板文件路径超出存储目录",
+            ) from exc
+        return resolved
+
+    def _require_file(self, file_path: str | None) -> Path:
         if not file_path:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="该模板没有关联 Word 文件")
-        path = Path(file_path)
+        path = self._resolve_storage_path(file_path)
         if not path.is_file():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板文件不存在")
         return path

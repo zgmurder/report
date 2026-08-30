@@ -109,7 +109,7 @@ export interface SearchResult {
   summary?: string | null
   row_count: number
   elapsed_ms: number
-  executed_sql: string
+  executed_sql?: string | null
   truncated: boolean
 }
 

@@ -90,6 +90,41 @@ def resolve_dept_data_scope(
     )
 
 
+def dept_scope_sql(
+    scope: DeptDataScope,
+    *,
+    code_column: str,
+    name_column: str,
+    param_prefix: str = "scope",
+) -> tuple[str, dict]:
+    """Raw-SQL equivalent of sqlalchemy_dept_match (exact/first-8/name)."""
+    if scope.unrestricted:
+        return "", {}
+    code = (scope.dept_code or "").strip()
+    name = (scope.dept_name or "").strip()
+    short = scope.short_dept_name
+    clauses: list[str] = []
+    params: dict = {}
+    if code:
+        params[f"{param_prefix}_code"] = code
+        clauses.append(f"TRIM(COALESCE({code_column}, '')) = :{param_prefix}_code")
+        left8 = code[:8] if len(code) >= 8 else code
+        if left8:
+            params[f"{param_prefix}_code8"] = left8
+            clauses.append(f"LEFT(TRIM(COALESCE({code_column}, '')), 8) = :{param_prefix}_code8")
+    if name:
+        params[f"{param_prefix}_name"] = name
+        clauses.append(f"TRIM(COALESCE({name_column}, '')) = :{param_prefix}_name")
+        if short and short != name:
+            params[f"{param_prefix}_short"] = short
+            params[f"{param_prefix}_name_like"] = f"%{short}%"
+            clauses.append(f"TRIM(COALESCE({name_column}, '')) = :{param_prefix}_short")
+            clauses.append(f"TRIM(COALESCE({name_column}, '')) LIKE :{param_prefix}_name_like")
+    if not clauses:
+        return " AND 1=0", {}
+    return f" AND ({' OR '.join(clauses)})", params
+
+
 def sqlalchemy_dept_match(code_column, name_column, scope: DeptDataScope):
     """SQLAlchemy 本部门匹配（代码全等 / 前8位 / 名称）。市局返回 None。"""
     if scope.unrestricted:

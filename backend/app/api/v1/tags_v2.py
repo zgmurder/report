@@ -122,9 +122,13 @@ def search_tag_v2_alarms(
 
 
 @router.get("/alarms/{fkdbh}")
-def get_tag_v2_alarm_detail(fkdbh: str = Path(), db: Session = Depends(get_db)):
+def get_tag_v2_alarm_detail(
+    fkdbh: str = Path(),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     try:
-        return ok(TagV2Service.get_alarm_detail(db, fkdbh))
+        return ok(TagV2Service.get_alarm_detail(db, fkdbh, current_user))
     except ServiceException as exc:
         raise HTTPException(status_code=exc.code if 400 <= exc.code < 600 else 400, detail=exc.message) from exc
 

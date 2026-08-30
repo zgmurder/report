@@ -51,6 +51,8 @@ import {
   NIcon,
   NInput,
   NModal,
+  NRadioButton,
+  NRadioGroup,
   NSelect,
   NSpin,
   NTag,
@@ -463,11 +465,18 @@ const tableColumns = computed<DataTableColumns<TagV2AlarmRow>>(() => [
     ellipsis: { tooltip: true },
     render: (row) =>
       h(
-        'button',
+        'span',
         {
-          type: 'button',
-          class: 'font-mono text-blue-600 hover:underline',
-          onClick: () => openDetail(row)
+          class: 'cursor-pointer font-mono text-[13px] text-[#1890ff] hover:underline',
+          role: 'button',
+          tabindex: 0,
+          onClick: () => openDetail(row),
+          onKeydown: (e: KeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              openDetail(row)
+            }
+          }
         },
         row.fkdbh || '-'
       )
@@ -1244,21 +1253,16 @@ onMounted(async () => {
             </template>
           </NInput>
         </div>
-        <div class="mt-3 flex flex-wrap gap-1.5" :class="isStatsGlobalSearch ? 'pointer-events-none opacity-45' : ''">
-          <button
-            v-for="opt in statsLevelOptions"
-            :key="opt.value"
-            type="button"
-            class="rounded-full px-2.5 py-1 text-xs transition"
-            :class="
-              !isStatsGlobalSearch && statsLevel === opt.value
-                ? 'bg-blue-600 text-white shadow-sm shadow-blue-200'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
-            "
-            @click="statsLevel = opt.value"
-          >
-            {{ opt.label }}
-          </button>
+        <div class="mt-3" :class="isStatsGlobalSearch ? 'opacity-45' : ''">
+          <NRadioGroup v-model:value="statsLevel" size="small" :disabled="isStatsGlobalSearch">
+            <NRadioButton
+              v-for="opt in statsLevelOptions"
+              :key="opt.value"
+              :value="opt.value"
+            >
+              {{ opt.label }}
+            </NRadioButton>
+          </NRadioGroup>
         </div>
         <div v-if="activeStatPrefix" class="mt-2 flex items-center gap-2 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs text-blue-700">
           <span class="min-w-0 flex-1 truncate">筛选：{{ activeStatPrefix }}</span>
@@ -1279,40 +1283,47 @@ onMounted(async () => {
                     : '当前条件下暂无统计'
             }}
           </div>
-          <div class="space-y-2">
-            <button
+          <div class="space-y-1.5">
+            <div
               v-for="item in displayStatsItems"
               :key="item.pathPrefix || item.label"
-              type="button"
-              class="w-full rounded-xl border px-3 py-2.5 text-left transition"
+              role="button"
+              tabindex="0"
+              class="w-full cursor-pointer rounded-lg border px-3 py-2 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-[#1890ff]/40"
               :class="
                 activeStatPrefix === item.pathPrefix
-                  ? 'border-blue-300 bg-blue-50/90 shadow-sm shadow-blue-100'
-                  : 'border-slate-100 bg-white/70 hover:border-blue-200 hover:bg-blue-50/40'
+                  ? 'border-[#91d5ff] bg-[#e6f7ff]'
+                  : 'border-[#f0f0f0] bg-white hover:border-[#91d5ff] hover:bg-[#f5faff]'
               "
               @click="selectStatCard(item)"
+              @keydown.enter.prevent="selectStatCard(item)"
+              @keydown.space.prevent="selectStatCard(item)"
             >
-              <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center justify-between gap-2">
                 <div class="min-w-0">
-                  <p class="truncate font-medium text-slate-800" :title="item.label">
+                  <p class="truncate text-sm font-medium text-slate-800" :title="item.label">
                     {{ leafLabel(item.label) }}
                   </p>
-                  <p v-if="item.label.includes('/')" class="mt-0.5 truncate text-[11px] text-slate-400" :title="item.label">
+                  <p
+                    v-if="item.label.includes('/')"
+                    class="mt-0.5 truncate text-[11px] text-slate-400"
+                    :title="item.label"
+                  >
                     {{ item.label }}
                   </p>
                 </div>
-                <div class="shrink-0 text-right">
-                  <p class="text-base font-semibold tabular-nums text-blue-700">{{ item.alarmCount }}</p>
-                  <p class="text-[11px] text-slate-400">警情</p>
-                </div>
+                <p class="shrink-0 text-right leading-none">
+                  <span class="text-base font-semibold tabular-nums text-[#1890ff]">{{ item.alarmCount }}</span>
+                  <span class="mt-0.5 block text-[11px] text-slate-400">警情</span>
+                </p>
               </div>
-              <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div class="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-100">
                 <div
-                  class="h-full rounded-full bg-gradient-to-r from-blue-500 to-sky-400 transition-all"
-                  :style="{ width: `${Math.max(8, (item.alarmCount / maxStatCount) * 100)}%` }"
+                  class="h-full rounded-full bg-[#1890ff] transition-all"
+                  :style="{ width: `${Math.max(6, (item.alarmCount / maxStatCount) * 100)}%` }"
                 />
               </div>
-            </button>
+            </div>
           </div>
         </NSpin>
       </div>

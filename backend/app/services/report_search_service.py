@@ -183,7 +183,7 @@ class ReportSearchService:
             rows=rows,
             row_count=len(rows),
             elapsed_ms=round((perf_counter() - started) * 1000),
-            executed_sql=executed_sql,
+            executed_sql=None,
             truncated=truncated,
         )
 
@@ -251,7 +251,7 @@ class ReportSearchService:
             rows=rows,
             row_count=len(rows),
             elapsed_ms=round((perf_counter() - started) * 1000),
-            executed_sql=executed_sql,
+            executed_sql=None,
             truncated=truncated,
         )
 

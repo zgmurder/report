@@ -11,6 +11,7 @@ import {
   listReportFolders,
   listReports,
   saveReportContent,
+  saveReportDraft,
   updateReport,
   updateReportFolder,
   type ReportContent,
@@ -81,7 +82,9 @@ export const useReportStore = defineStore('report', {
     },
     async loadReport(id: number) {
       this.currentReport = await getReport(id)
-      const content = this.currentReport.content_json || this.currentReport.draft_json
+      const content = this.currentReport.status === 'draft'
+        ? this.currentReport.draft_json || this.currentReport.content_json
+        : this.currentReport.content_json
       this.editingContent = content ? structuredClone(toRaw(content)) : null
       this.htmlSnapshot = this.currentReport.html_snapshot || ''
       this.editorConfig = this.currentReport.editor_config ? structuredClone(toRaw(this.currentReport.editor_config)) : null
@@ -101,8 +104,11 @@ export const useReportStore = defineStore('report', {
     async save(id: number, content: ReportContent | undefined, htmlSnapshot: string | undefined, editorConfig: ReportEditorConfig) {
       const target = content || this.editingContent
       if (!target) return
-      this.currentReport = await saveReportContent(id, target, htmlSnapshot ?? this.htmlSnapshot, editorConfig)
-      this.editingContent = this.currentReport.content_json || target
+      const saveRequest = this.currentReport?.status === 'confirmed' ? saveReportContent : saveReportDraft
+      this.currentReport = await saveRequest(id, target, htmlSnapshot ?? this.htmlSnapshot, editorConfig)
+      this.editingContent = (this.currentReport.status === 'draft'
+        ? this.currentReport.draft_json || this.currentReport.content_json
+        : this.currentReport.content_json) || target
       this.htmlSnapshot = this.currentReport.html_snapshot || htmlSnapshot || ''
       this.editorConfig = this.currentReport.editor_config || editorConfig
       const summary = this.reports.find((item) => item.id === id)

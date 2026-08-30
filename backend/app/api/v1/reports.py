@@ -78,7 +78,14 @@ def confirm_report(report_id: int, service: ReportService = Depends(get_service)
 
 @router.get("/{report_id}/export-html")
 def export_report_html(report_id: int, service: ReportService = Depends(get_service)):
-    return Response(content=service.export_html(report_id), media_type="text/html; charset=utf-8")
+    return Response(
+        content=service.export_html(report_id),
+        media_type="text/html; charset=utf-8",
+        headers={
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data: https:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/{report_id}/export-docx")
@@ -95,6 +102,11 @@ def export_report_docx(report_id: int, service: ReportService = Depends(get_serv
 @router.put("/{report_id}/content")
 def save_report(report_id: int, req: ReportSaveRequest, service: ReportService = Depends(get_service)):
     return ok(service.save(report_id, req))
+
+
+@router.put("/{report_id}/draft")
+def save_report_draft(report_id: int, req: ReportSaveRequest, service: ReportService = Depends(get_service)):
+    return ok(service.save_draft(report_id, req))
 
 
 @router.post("/{report_id}/generate-draft")

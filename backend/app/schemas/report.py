@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_serializer
 from app.core.timeutil import to_iso_cn
 
 ReportStatus = Literal["draft", "confirmed", "archived"]
+ReportSectionType = Literal["paragraph", "text", "html"]
 PageOrientation = Literal["portrait", "landscape"]
 PageLayout = Literal["page", "web"]
 
@@ -36,20 +37,20 @@ class ReportEditorConfig(BaseModel):
 
 
 class ReportSection(BaseModel):
-    id: str
-    title: str
-    type: str = "paragraph"
-    content: str | None = None
-    blocks: list[dict[str, Any]] = Field(default_factory=list)
-    source: list[str] = Field(default_factory=list)
+    id: str = Field(..., min_length=1, max_length=100)
+    title: str = Field(..., max_length=300)
+    type: ReportSectionType = "paragraph"
+    content: str | None = Field(default=None, max_length=500_000)
+    blocks: list[dict[str, Any]] = Field(default_factory=list, max_length=500)
+    source: list[str] = Field(default_factory=list, max_length=100)
     ai_generated: bool = False
 
 
 class ReportContent(BaseModel):
-    title: str
-    type: str
+    title: str = Field(..., min_length=1, max_length=200)
+    type: str = Field(..., min_length=1, max_length=50)
     params: dict[str, Any] = Field(default_factory=dict)
-    sections: list[ReportSection] = Field(default_factory=list)
+    sections: list[ReportSection] = Field(default_factory=list, max_length=200)
 
 
 class ReportCreateRequest(BaseModel):
@@ -67,7 +68,7 @@ class ReportUpdateRequest(BaseModel):
 
 class ReportSaveRequest(BaseModel):
     content_json: ReportContent
-    html_snapshot: str | None = None
+    html_snapshot: str | None = Field(default=None, max_length=1_000_000)
     editor_config: ReportEditorConfig = Field(default_factory=ReportEditorConfig)
 
 

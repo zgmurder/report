@@ -50,6 +50,10 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
         return False
 
 
+def is_admin(user: CurrentUser) -> bool:
+    return any(role.strip().lower() == "admin" for role in user.roles)
+
+
 def create_access_token(user: CurrentUser) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
     payload = {
@@ -97,3 +101,9 @@ def get_current_user(token: str | None = Depends(oauth2_scheme), db: Session = D
         roles=[item.strip() for item in str(row["roles"] or "user").split(",") if item.strip()],
         unit_code=row["unit_code"],
     )
+
+
+def require_admin(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    if not is_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要管理员权限")
+    return current_user

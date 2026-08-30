@@ -19,23 +19,22 @@ class ExportService:
     """
 
     def render_report_html(self, report: ReportDetail) -> str:
-        content = report.content_json or report.draft_json
+        content = report.content_json
         if not content:
             return self._html_document(report.title, "<p class=\"empty\">暂无报告内容。</p>", report.editor_config)
         body = self._render_content(content)
         return self._html_document(content.title or report.title, body, report.editor_config)
 
     def render_report_docx(self, report: ReportDetail) -> bytes:
-        content = report.content_json or report.draft_json
+        content = report.content_json
         document = Document()
         self._configure_docx_page(document, report.editor_config)
         styles = document.styles
         styles["Normal"].font.name = "Microsoft YaHei"
         styles["Normal"].font.size = Pt(10.5)
 
-        if report.html_snapshot:
-            self._append_html_to_docx(document, report.html_snapshot)
-        elif content:
+        if content:
+            document.add_heading(content.title or report.title, level=1)
             for section in content.sections:
                 if section.type == "html":
                     self._append_html_to_docx(document, section.content or "")
@@ -73,12 +72,7 @@ class ExportService:
         section.right_margin = Cm(page.margin.right)
 
     def _append_html_to_docx(self, document: Document, html: str) -> None:
-        """Convert the editor HTML while retaining its visible formatting.
-
-        UMO writes font, size, colour, alignment, spacing and similar formatting
-        into inline HTML styles. The old exporter used get_text(), which discarded
-        all of those styles. Keep the HTML snapshot as the source for Word runs.
-        """
+        """Convert sanitized structured-section HTML into Word content."""
         soup = BeautifulSoup(html, "html.parser")
         root = soup.body or soup
         for node in root.children:

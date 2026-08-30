@@ -117,7 +117,7 @@ class ReportSearchResult(BaseModel):
     summary: str | None = None
     row_count: int
     elapsed_ms: int
-    executed_sql: str
+    executed_sql: str | None = None
     truncated: bool = False
 
 

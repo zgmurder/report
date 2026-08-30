@@ -7,11 +7,13 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.domain.atomic_metric.exceptions import ServiceException
 from app.core.security import CurrentUser
 from app.models.intelligence import JqTagResult, TagDictV2
+from app.repositories.tag_v2_repository import TagV2Repository
 from app.schemas.tag_v2 import IntelligenceTagV2VerifyModel
 from app.domain.warning.dept_data_scope import resolve_dept_data_scope
 import logging
@@ -542,9 +544,10 @@ class TagV2Service:
         if not code:
             return
         digits = ''.join(ch for ch in code if ch.isdigit()) or code
-        clauses.append('(r.`fkdwdm` = :fkdwdm OR r.`fkdwdm` LIKE :fkdwdm_like)')
+        left8 = digits[:8] if len(digits) >= 8 else digits
+        clauses.append('(TRIM(COALESCE(r.`fkdwdm`, \'\')) = :fkdwdm OR LEFT(TRIM(COALESCE(r.`fkdwdm`, \'\')), 8) = :fkdwdm8)')
         params['fkdwdm'] = digits
-        params['fkdwdm_like'] = f'{digits}%'
+        params['fkdwdm8'] = left8
 
     @classmethod
     def _build_search_where(
@@ -909,36 +912,14 @@ class TagV2Service:
         return text_value or None
 
     @classmethod
-    def get_alarm_detail(cls, db: Session, fkdbh: str) -> dict[str, Any]:
+    def get_alarm_detail(cls, db: Session, fkdbh: str, current_user: CurrentUser) -> dict[str, Any]:
         key = str(fkdbh or '').strip()
         if not key:
             raise ServiceException(message='反馈单编号不能为空')
-        sql = f"""
-            SELECT
-              f.`fkdbh`, f.`jjdbh`, f.`bjsj`, f.`fkdwmc`, f.`fkdwdm`,
-              f.`zrmj`, f.`cjqk`,
-              (
-                SELECT r.`jqqh` FROM `{TAG_RESULT_TABLE}` r
-                WHERE r.`fkdbh` COLLATE utf8mb4_unicode_ci = f.`fkdbh` COLLATE utf8mb4_unicode_ci
-                ORDER BY r.`id` DESC LIMIT 1
-              ) AS jqqh,
-              (
-                SELECT r.`czyj` FROM `{TAG_RESULT_TABLE}` r
-                WHERE r.`fkdbh` COLLATE utf8mb4_unicode_ci = f.`fkdbh` COLLATE utf8mb4_unicode_ci
-                ORDER BY r.`id` DESC LIMIT 1
-              ) AS czyj,
-              (
-                SELECT r.`cjqk` FROM `{TAG_RESULT_TABLE}` r
-                WHERE r.`fkdbh` COLLATE utf8mb4_unicode_ci = f.`fkdbh` COLLATE utf8mb4_unicode_ci
-                ORDER BY r.`id` DESC LIMIT 1
-              ) AS result_cjqk
-            FROM `{FKD_TABLE}` f
-            WHERE f.`fkdbh` = :fkdbh
-            LIMIT 1
-        """
-        row = (db.execute(text(sql), {'fkdbh': key})).mappings().first()
+        scope = resolve_dept_data_scope(current_user, db)
+        row = TagV2Repository(db).get_scoped_alarm(key, scope, full=True)
         if not row:
-            raise ServiceException(message='未找到对应反馈单')
+            raise ServiceException(code=404, message='未找到对应反馈单')
         tags = (cls._load_tags_by_fkdbh(db, [key])).get(key, [])
         persons = (cls._load_persons_by_fkdbh(db, [key])).get(key, [])
         manual_count = sum(1 for item in tags if item.get('source') == 'manual')
@@ -975,21 +956,12 @@ class TagV2Service:
         if not fkdbh:
             raise ServiceException(message='反馈单编号不能为空')
 
-        detail_sql = f"""
-            SELECT
-              f.`fkdbh`, f.`bjsj`,
-              (
-                SELECT r.`jqqh` FROM `{TAG_RESULT_TABLE}` r
-                WHERE r.`fkdbh` COLLATE utf8mb4_unicode_ci = f.`fkdbh` COLLATE utf8mb4_unicode_ci
-                ORDER BY r.`id` DESC LIMIT 1
-              ) AS jqqh
-            FROM `{FKD_TABLE}` f
-            WHERE f.`fkdbh` = :fkdbh
-            LIMIT 1
-        """
-        alarm = (db.execute(text(detail_sql), {'fkdbh': fkdbh})).mappings().first()
+        scope = resolve_dept_data_scope(current_user, db)
+        # Serialize all verification changes for one alarm and re-check scope on
+        # the locked source row in the same transaction.
+        alarm = TagV2Repository(db).get_scoped_alarm(fkdbh, scope, full=False, for_update=True)
         if not alarm:
-            raise ServiceException(message='未找到对应反馈单')
+            raise ServiceException(code=404, message='未找到对应反馈单')
 
         requested_paths = []
         seen = set()
@@ -1058,5 +1030,11 @@ class TagV2Service:
                 )
             )
 
-        db.commit()
-        return cls.get_alarm_detail(db, fkdbh)
+        try:
+            db.flush()
+            detail = cls.get_alarm_detail(db, fkdbh, current_user)
+            db.commit()
+            return detail
+        except IntegrityError as exc:
+            db.rollback()
+            raise ServiceException(code=409, message='标签已被并发更新，请刷新后重试') from exc

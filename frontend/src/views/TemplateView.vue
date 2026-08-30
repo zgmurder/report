@@ -15,7 +15,7 @@ import {
   useDialog,
   useMessage,
 } from 'naive-ui'
-import { ArrowLeft, Download, FileText, Pencil, Plus, Trash2, Upload } from 'lucide-vue-next'
+import { ArrowLeft, Download, Pencil, Plus, Trash2, Upload } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { downloadTemplate, type ReportTemplateItem } from '@/api/catalog'
 import { useCatalogStore } from '@/stores/catalog'
@@ -76,10 +76,7 @@ const columns: DataTableColumns<ReportTemplateItem> = [
     key: 'name',
     minWidth: 220,
     render: (row) => h('div', { class: 'name-cell' }, [
-      h('div', { class: 'name-main' }, [
-        h('div', { class: 'word-icon' }, [h(FileText, { size: 20 })]),
-        h('strong', row.name),
-      ]),
+      h('strong', { class: 'name-main' }, row.name),
       h('small', row.original_filename || '未上传 Word 文件'),
     ]),
   },
@@ -276,10 +273,8 @@ h2 { margin: 0 0 4px; font-size: 20px; }
 p { margin: 0; }
 .filters { width: min(360px, 100%); margin-bottom: 16px; }
 .name-cell { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
-.name-main { display: flex; min-width: 0; align-items: center; gap: 8px; }
-.name-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name-main { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .name-cell small { display: block; overflow: hidden; color: #8c8c8c; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
-.word-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: none; color: #1890ff; background: #e6f7ff; border-radius: 5px; }
 .modal-card { width: min(560px, calc(100vw - 32px)); padding: 22px; background: #fff; border-radius: 8px; }
 .modal-card h3 { margin: 0 0 18px; font-size: 18px; }
 .upload-hint { display: block; margin-top: 8px; color: #8c8c8c; font-size: 12px; }

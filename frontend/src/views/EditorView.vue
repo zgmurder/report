@@ -404,10 +404,13 @@ async function save(value = html.value, config = editorConfig.value, editorDocum
 async function exportWord(value: string, config = editorConfig.value, editorDocument = documentJson.value) {
   try {
     await save(value, config, editorDocument)
+    if (store.currentReport?.status !== 'confirmed') {
+      await store.confirmDraft(reportId.value)
+    }
     await downloadReportDocx(reportId.value, title.value)
     message.success('Word 文档已导出')
-  } catch {
-    message.error('Word 文档导出失败')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : 'Word 文档导出失败')
   }
 }
 

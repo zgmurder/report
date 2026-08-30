@@ -112,12 +112,21 @@ export function exportReportHtmlUrl(id: number) {
   return `/api/v1/reports/${id}/export-html`
 }
 
+async function readableDownloadError(response: Response, fallback: string) {
+  try {
+    const data = await response.json() as { detail?: string }
+    return data.detail || fallback
+  } catch {
+    return fallback
+  }
+}
+
 export async function downloadReportDocx(id: number, title: string) {
   const token = localStorage.getItem('report_access_token')
   const response = await fetch(`/api/v1/reports/${id}/export-docx`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
-  if (!response.ok) throw new Error('Word 导出失败')
+  if (!response.ok) throw new Error(await readableDownloadError(response, 'Word 导出失败'))
   const blob = await response.blob()
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -135,4 +144,8 @@ export function generateReportDraft(id: number, data: { report_type: string; sou
 
 export function saveReportContent(id: number, content_json: ReportContent, html_snapshot: string | undefined, editor_config: ReportEditorConfig) {
   return apiPut<ReportItem>(`/reports/${id}/content`, { content_json, html_snapshot, editor_config })
+}
+
+export function saveReportDraft(id: number, content_json: ReportContent, html_snapshot: string | undefined, editor_config: ReportEditorConfig) {
+  return apiPut<ReportItem>(`/reports/${id}/draft`, { content_json, html_snapshot, editor_config })
 }
