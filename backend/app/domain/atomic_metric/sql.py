@@ -7,9 +7,9 @@
 ================================================================================
 | 场景                         | 时间列        | 部门列      | 市局匹配   | 对应组件              |
 |------------------------------|---------------|-------------|------------|-----------------------|
-| 无类别/类型/细类（总量）     | insert_time   | fkdwdm      | LEFT 5     | stat_alarm_total_text |
+| 无类别/类型/细类（总量）     | insert_time   | fkdwdm      | LEFT 6     | stat_alarm_total_text |
 | 有类别/类型/细类             | bjsj          | txfkdwdm    | LEFT 6     | 类别/类型/细类组件    |
-| 研判包过滤（fkd）            | bjsj          | fkdwdm      | LEFT 5     | 对齐 ywjq_analysis 取号 |
+| 研判包过滤（fkd）            | bjsj          | fkdwdm      | LEFT 6     | 对齐 ywjq_analysis 取号 |
 | 地区表（与总量同口径）       | 同上          | 同上        | 同上       | 全市 DISTINCT，非各所加 |
 | 接警单 jjd_*                 | 动态解析      | gxdwdm优先  | LEFT 6     | —                     |
 
@@ -30,7 +30,8 @@
 - exclude_self_received=True → 除自接警：排除 jjdwdm = gxdwdm 的记录
 - tag_package_id → 先按研判包标签查 ywjq_analysis 得 cjdbh（勾选同比/环比时时间窗扩到历史期），再强制用 fkd_fkd 按 cjdbh IN (...) 过滤（勿用 jjd）
 - 社区统计取 fkd_fkd.sdsq；前端选接警单时用 jjd_jjd.jjdbh=fkd.jjdbh 关联，维度/时间/部门按接警单过滤
-- 类别=刑事(10)/行政(治安)(20)/交通(20000) → 原子查询强制 fkd_fkd（仅本次，不改前端全局数据源；维度改 ajlb*；交通辖区按 txfkdwdm 出交警中队）
+- 类别=刑事(10)/行政(治安)(20)/交通(20000) → 不再自动切表，一律跟前端全局数据源；交通辖区仍可按名称保留中队/大队
+- 类型/细类拆分同样跟全局数据源，不因字典码差异自动改查另一张表
 - 地区/同比趋势单位名排除：中队、大队、分局、市局、指挥中心（类别=交通时保留中队/大队）
 
 ================================================================================
@@ -55,7 +56,7 @@ WHERE 片段
   12. build_hot_community_sql    — 社区（fkd.sdsq；接警口径可 jjdbh 关联 jjd）
   12b. build_community_yoy_sql    — 社区同比（同口径）
  12c. build_hot_period_sql       — 高发时段（按 N 小时分桶）
- 13. build_region_station_sql   — 地区表（jz_dept + cur/mom/yoy，含全市）
+  13. build_region_station_sql   — 地区表（jz_dept + 当期量，含全市；同比环比程序算）
                                   下级所同比趋势 / 同比分析复用，由 service 过滤文案
  14. build_station_dim_yoy_sql  — 同比分析下钻：指定派出所 × 类别/类型 同比
 
@@ -70,7 +71,7 @@ import re
 from typing import Any
 
 from app.domain.atomic_metric.exceptions import ServiceException
-from app.domain.atomic_metric.sql_rules import DATE_END_EXCLUSIVE_EXPR
+from app.domain.atomic_metric.sql_rules import DATE_END_EXCLUSIVE_EXPR, date_end_bound_expr
 
 
 def _pick(params: dict[str, Any], *keys: str) -> str:
@@ -94,32 +95,79 @@ def _pick(params: dict[str, Any], *keys: str) -> str:
     return ''
 
 
-def _dept_where(dept_expr: str, prefix_len: int = 5, *, require_not_null: bool = True) -> str:
-    """部门过滤片段（市局码以 000000 结尾时按前缀匹配）。"""
-    n = 6 if int(prefix_len) >= 6 else 5
-    not_null = f'\n    AND {dept_expr} IS NOT NULL' if require_not_null else ''
+def _is_city_bureau_code(dept_code: str | None) -> bool:
+    """市局码：以 000000 结尾（如 330782000000）。"""
+    text = str(dept_code or '').strip()
+    return bool(text) and text.endswith('000000')
+
+
+def _dept_where(
+    dept_expr: str,
+    prefix_len: int = 6,
+    *,
+    dept_code: str | None = None,
+    require_not_null: bool = True,
+) -> str:
+    """部门过滤片段。
+
+    传入 dept_code 时按实值简化：
+    - 空：不加条件
+    - 市局：LEFT(col,6)=LEFT(:dept_code,6)
+    - 派出所：col = :dept_code
+    未传 dept_code 时保留兼容的 IF 绑定写法。
+    """
+    n = 6 if int(prefix_len) <= 0 else min(int(prefix_len), 6)
+    not_null = f'\n  AND {dept_expr} IS NOT NULL' if require_not_null else ''
+    if dept_code is not None:
+        code = str(dept_code or '').strip()
+        if not code:
+            return ''
+        if _is_city_bureau_code(code):
+            return f'\n  AND LEFT({dept_expr}, {n}) = LEFT(:dept_code, {n}){not_null}'
+        return f'\n  AND {dept_expr} = :dept_code'
+
     return f"""
-    AND (
-      :dept_code = ''
-      OR IF(
-        RIGHT(:dept_code, 6) = '000000',
-        LEFT({dept_expr}, {n}) = LEFT(:dept_code, {n}),
-        {dept_expr} = :dept_code
-      )
-    ){not_null}"""
+  AND (
+    :dept_code = ''
+    OR IF(
+      RIGHT(:dept_code, 6) = '000000',
+      LEFT({dept_expr}, {n}) = LEFT(:dept_code, {n}),
+      {dept_expr} = :dept_code
+    )
+  ){not_null}"""
 
 
-def _dim_where(dim_filters: dict[str, str], *, qualify_alias: str | None = None) -> str:
-    """维度过滤：空=不过滤；单值/多值（逗号分隔）均用 FIND_IN_SET 匹配。"""
+def _dim_where(
+    dim_filters: dict[str, str],
+    *,
+    dim_values: dict[str, str] | None = None,
+    qualify_alias: str | None = None,
+) -> str:
+    """维度过滤。
+
+    传入 dim_values 时：空值跳过；单值用等值；多值用 FIND_IN_SET。
+    未传时保留「空串跳过」的兼容写法。
+    """
     if not dim_filters:
         return ''
     parts: list[str] = []
     for param, col in dim_filters.items():
         col_expr = AtomicMetricSql.qualify_expr(col, qualify_alias) if qualify_alias else col
-        parts.append(
-            f"(:{param} = '' OR FIND_IN_SET(CAST({col_expr} AS CHAR), :{param}) > 0)"
-        )
-    return ' AND ' + ' AND '.join(parts)
+        if dim_values is not None:
+            value = str(dim_values.get(param) or '').strip()
+            if not value:
+                continue
+            if ',' in value:
+                parts.append(f'FIND_IN_SET(CAST({col_expr} AS CHAR), :{param}) > 0')
+            else:
+                parts.append(f'CAST({col_expr} AS CHAR) = :{param}')
+        else:
+            parts.append(
+                f"(:{param} = '' OR FIND_IN_SET(CAST({col_expr} AS CHAR), :{param}) > 0)"
+            )
+    if not parts:
+        return ''
+    return '\n  AND ' + ' AND '.join(parts)
 
 
 def _case_id_col(columns: set[str]) -> str | None:
@@ -509,12 +557,12 @@ class AtomicMetricSql:
                     )
                 )
                 return time_col, dept_expr, 6
-            # 研判包无维度：时间用 bjsj，部门仍对齐总量口径 fkdwdm LEFT 5
+            # 研判包无维度：时间用 bjsj，部门仍对齐总量口径 fkdwdm LEFT 6
             dept_expr = (
                 'fkdwdm' if 'fkdwdm' in columns else cls.resolve_dept_expr(columns, data_source)
             )
-            return time_col, dept_expr, 5
-        # 对齐接警总量：insert_time + fkdwdm + LEFT 5
+            return time_col, dept_expr, 6
+        # 对齐接警总量：insert_time + fkdwdm + LEFT 6
         time_col = (
             'insert_time'
             if 'insert_time' in columns
@@ -523,7 +571,7 @@ class AtomicMetricSql:
         dept_expr = (
             'fkdwdm' if 'fkdwdm' in columns else cls.resolve_dept_expr(columns, data_source)
         )
-        return time_col, dept_expr, 5
+        return time_col, dept_expr, 6
 
     @classmethod
     def resolve_time_column(cls, columns: set[str], data_source: str) -> str:
@@ -572,7 +620,7 @@ class AtomicMetricSql:
         if 'zjjdbh' in columns and 'jjdbh' in columns:
             z = q('zjjdbh')
             j = q('jjdbh')
-            return f"CASE WHEN {z} IS NOT NULL AND {z} <> '' THEN {z} ELSE {j} END"
+            return f"COALESCE(NULLIF(TRIM({z}), ''), {j})"
         if 'jjdbh' in columns:
             return q('jjdbh')
         if 'cjdbh' in columns:
@@ -709,7 +757,7 @@ class AtomicMetricSql:
         count_id: str,
         include_yoy: bool,
         include_mom: bool,
-        dept_prefix_len: int = 5,
+        dept_prefix_len: int = 6,
         columns: set[str] | None = None,
         filter_duplicate: bool = False,
         exclude_non_police: bool = False,
@@ -719,130 +767,16 @@ class AtomicMetricSql:
         extra_where: str = '',
         include_yoy_count: bool = False,
         include_mom_count: bool = False,
+        dept_code: str | None = None,
+        dim_values: dict[str, str] | None = None,
+        date_end: str | None = None,
     ) -> str:
-        """★ 总量 SQL（可选同比/环比%、同比数/环比数）。改总量统计逻辑优先改这里。"""
-        dim_where = _dim_where(dim_filters)
-        dept_where = _dept_where(dept_expr, dept_prefix_len)
-        extra = _optional_filter_where(
-            columns or set(),
-            filter_duplicate=filter_duplicate,
-            exclude_non_police=exclude_non_police,
-            exclude_traffic=exclude_traffic,
-            filter_self_received=filter_self_received,
-            exclude_self_received=exclude_self_received,
-            table_name=table_name,
-            time_col=time_col,
-            extra_where=extra_where,
-        )
-
-        need_compare = bool(include_yoy or include_mom or include_yoy_count or include_mom_count)
-        if not need_compare:
-            return f"""SELECT
-  {total_agg} AS total
-FROM {table_name}
-WHERE {time_col} >= :date_start
-  AND {time_col} < {DATE_END_EXCLUSIVE_EXPR}
-  {dept_where}
-  {dim_where}{extra}""".strip()
-
-        if count_id == '*':
-            cur_expr = f'SUM(CASE WHEN {time_col} >= p.cur_start AND {time_col} < p.cur_end THEN 1 ELSE 0 END)'
-            mom_expr = f'SUM(CASE WHEN {time_col} >= p.mom_start AND {time_col} < p.cur_start THEN 1 ELSE 0 END)'
-            yoy_expr = f'SUM(CASE WHEN {time_col} >= p.yoy_start AND {time_col} < p.yoy_end THEN 1 ELSE 0 END)'
-        else:
-            cur_expr = (
-                f'COUNT(DISTINCT CASE WHEN {time_col} >= p.cur_start AND {time_col} < p.cur_end '
-                f'THEN {count_id} END)'
-            )
-            mom_expr = (
-                f'COUNT(DISTINCT CASE WHEN {time_col} >= p.mom_start AND {time_col} < p.cur_start '
-                f'THEN {count_id} END)'
-            )
-            yoy_expr = (
-                f'COUNT(DISTINCT CASE WHEN {time_col} >= p.yoy_start AND {time_col} < p.yoy_end '
-                f'THEN {count_id} END)'
-            )
-
-        select_parts = ['s.cur_total AS total']
-        if include_mom:
-            select_parts.append(
-                'ROUND(IF(s.mom_total = 0, 0, (s.cur_total - s.mom_total) / s.mom_total * 100), 1) AS mom'
-            )
-        if include_yoy:
-            select_parts.append(
-                'ROUND(IF(s.yoy_total = 0, 0, (s.cur_total - s.yoy_total) / s.yoy_total * 100), 1) AS yoy'
-            )
-        if include_mom_count:
-            select_parts.append('s.mom_total AS mom_count')
-        if include_yoy_count:
-            select_parts.append('s.yoy_total AS yoy_count')
-
-        return f"""WITH params AS (
-  SELECT
-    CAST(:date_start AS DATETIME) AS cur_start,
-    CASE
-      WHEN CHAR_LENGTH(:date_end) <= 10 THEN DATE_ADD(:date_end, INTERVAL 1 DAY)
-      ELSE DATE_ADD(:date_end, INTERVAL 1 SECOND)
-    END AS cur_end,
-    DATE_SUB(
-      CAST(:date_start AS DATETIME),
-      INTERVAL TIMESTAMPDIFF(
-        SECOND,
-        CAST(:date_start AS DATETIME),
-        CASE
-          WHEN CHAR_LENGTH(:date_end) <= 10 THEN DATE_ADD(:date_end, INTERVAL 1 DAY)
-          ELSE DATE_ADD(:date_end, INTERVAL 1 SECOND)
-        END
-      ) SECOND
-    ) AS mom_start,
-    DATE_SUB(CAST(:date_start AS DATETIME), INTERVAL 1 YEAR) AS yoy_start,
-    DATE_SUB(
-      CASE
-        WHEN CHAR_LENGTH(:date_end) <= 10 THEN DATE_ADD(:date_end, INTERVAL 1 DAY)
-        ELSE DATE_ADD(:date_end, INTERVAL 1 SECOND)
-      END,
-      INTERVAL 1 YEAR
-    ) AS yoy_end
-),
-stats AS (
-  SELECT
-    {cur_expr} AS cur_total,
-    {mom_expr} AS mom_total,
-    {yoy_expr} AS yoy_total
-  FROM {table_name}
-  CROSS JOIN params p
-  WHERE
-    (
-      ({time_col} >= p.cur_start AND {time_col} < p.cur_end)
-      OR ({time_col} >= p.mom_start AND {time_col} < p.cur_start)
-      OR ({time_col} >= p.yoy_start AND {time_col} < p.yoy_end)
-    )
-    {dept_where}
-    {dim_where}{extra}
-)
-SELECT
-  {', '.join(select_parts)}
-FROM stats s""".strip()
-
-    @classmethod
-    def build_base_total_sql(
-        cls,
-        *,
-        table_name: str,
-        time_col: str,
-        dept_expr: str,
-        total_agg: str,
-        dept_prefix_len: int = 5,
-        columns: set[str] | None = None,
-        filter_duplicate: bool = False,
-        exclude_non_police: bool = False,
-        exclude_traffic: bool = False,
-        filter_self_received: bool = False,
-        exclude_self_received: bool = False,
-        extra_where: str = '',
-    ) -> str:
-        """占比分母：同时间/部门、不限类别类型细类。"""
-        dept_where = _dept_where(dept_expr, dept_prefix_len)
+        """★ 总量 SQL：只查当期 COUNT。同比/环比/占比由 service 程序侧计算。"""
+        # include_* 保留参数兼容旧调用，不再在 SQL 内算对比指标
+        _ = (include_yoy, include_mom, include_yoy_count, include_mom_count, count_id)
+        dim_where = _dim_where(dim_filters, dim_values=dim_values)
+        dept_where = _dept_where(dept_expr, dept_prefix_len, dept_code=dept_code)
+        end_bound = date_end_bound_expr(date_end)
         extra = _optional_filter_where(
             columns or set(),
             filter_duplicate=filter_duplicate,
@@ -858,8 +792,46 @@ FROM stats s""".strip()
   {total_agg} AS total
 FROM {table_name}
 WHERE {time_col} >= :date_start
-  AND {time_col} < {DATE_END_EXCLUSIVE_EXPR}
-  {dept_where}{extra}""".strip()
+  AND {time_col} < {end_bound}{dept_where}{dim_where}{extra}""".strip()
+
+    @classmethod
+    def build_base_total_sql(
+        cls,
+        *,
+        table_name: str,
+        time_col: str,
+        dept_expr: str,
+        total_agg: str,
+        dept_prefix_len: int = 6,
+        columns: set[str] | None = None,
+        filter_duplicate: bool = False,
+        exclude_non_police: bool = False,
+        exclude_traffic: bool = False,
+        filter_self_received: bool = False,
+        exclude_self_received: bool = False,
+        extra_where: str = '',
+        dept_code: str | None = None,
+        date_end: str | None = None,
+    ) -> str:
+        """占比分母：同时间/部门、不限类别类型细类。"""
+        dept_where = _dept_where(dept_expr, dept_prefix_len, dept_code=dept_code)
+        end_bound = date_end_bound_expr(date_end)
+        extra = _optional_filter_where(
+            columns or set(),
+            filter_duplicate=filter_duplicate,
+            exclude_non_police=exclude_non_police,
+            exclude_traffic=exclude_traffic,
+            filter_self_received=filter_self_received,
+            exclude_self_received=exclude_self_received,
+            table_name=table_name,
+            time_col=time_col,
+            extra_where=extra_where,
+        )
+        return f"""SELECT
+  {total_agg} AS total
+FROM {table_name}
+WHERE {time_col} >= :date_start
+  AND {time_col} < {end_bound}{dept_where}{extra}""".strip()
 
     # ------------------------------------------------------------------
     # 3) 类别 / 类型 / 细类占比
@@ -888,14 +860,19 @@ WHERE {time_col} >= :date_start
         filter_self_received: bool = False,
         exclude_self_received: bool = False,
         extra_where: str = '',
+        dept_code: str | None = None,
+        dim_values: dict[str, str] | None = None,
+        date_end: str | None = None,
     ) -> str:
-        """按维度代码分组：当期量、同比、占范围内比重。
+        """按维度代码分组：只返回当期量。
 
         有单号列时先按案件去重（每案每期只保留一个维度码），再按维度聚合，
         避免 fkd 多反馈行导致同一 cjdbh 跨类型重复计数（类型合计 > 总量）。
+        同比/环比/占比由 service 程序侧计算。
         """
-        dim_where = _dim_where(dim_filters)
-        dept_where = _dept_where(dept_expr, dept_prefix_len)
+        dim_where = _dim_where(dim_filters, dim_values=dim_values)
+        dept_where = _dept_where(dept_expr, dept_prefix_len, dept_code=dept_code)
+        end_bound = date_end_bound_expr(date_end)
         extra = _optional_filter_where(
             columns,
             filter_duplicate=filter_duplicate,
@@ -915,168 +892,49 @@ WHERE {time_col} >= :date_start
         code_not_empty = (
             f'AND {code_expr} IS NOT NULL AND TRIM(CAST({code_expr} AS CHAR)) <> \'\''
         )
-        params_cte = """params AS (
-  SELECT
-    CAST(:date_start AS DATETIME) AS cur_start,
-    CASE
-      WHEN CHAR_LENGTH(:date_end) <= 10 THEN DATE_ADD(:date_end, INTERVAL 1 DAY)
-      ELSE DATE_ADD(:date_end, INTERVAL 1 SECOND)
-    END AS cur_end,
-    DATE_SUB(
-      CAST(:date_start AS DATETIME),
-      INTERVAL TIMESTAMPDIFF(
-        SECOND,
-        CAST(:date_start AS DATETIME),
-        CASE
-          WHEN CHAR_LENGTH(:date_end) <= 10 THEN DATE_ADD(:date_end, INTERVAL 1 DAY)
-          ELSE DATE_ADD(:date_end, INTERVAL 1 SECOND)
-        END
-      ) SECOND
-    ) AS mom_start,
-    DATE_SUB(CAST(:date_start AS DATETIME), INTERVAL 1 YEAR) AS yoy_start,
-    DATE_SUB(
-      CASE
-        WHEN CHAR_LENGTH(:date_end) <= 10 THEN DATE_ADD(:date_end, INTERVAL 1 DAY)
-        ELSE DATE_ADD(:date_end, INTERVAL 1 SECOND)
-      END,
-      INTERVAL 1 YEAR
-    ) AS yoy_end
-)"""
-
+        # 只查当期量；同比/环比/占比由 service 在程序侧计算
+        # stats_alias / scope_total_alias 保留参数兼容旧调用，SQL 不再使用
+        _ = (stats_alias, scope_total_alias)
         if count_id == '*':
-            # 无单号列：无法按案去重，退回按行统计
-            return f"""WITH {params_cte},
-{stats_alias} AS (
-  SELECT
-    {code_sql} AS {code_alias},
-    MAX({name_pick_sql}) AS {name_alias},
-    SUM(CASE WHEN {time_col} >= p.cur_start AND {time_col} < p.cur_end THEN 1 ELSE 0 END) AS cur_total,
-    SUM(CASE WHEN {time_col} >= p.mom_start AND {time_col} < p.cur_start THEN 1 ELSE 0 END) AS mom_total,
-    SUM(CASE WHEN {time_col} >= p.yoy_start AND {time_col} < p.yoy_end THEN 1 ELSE 0 END) AS yoy_total
-  FROM {table_name}
-  CROSS JOIN params p
-  WHERE
-    (
-      ({time_col} >= p.cur_start AND {time_col} < p.cur_end)
-      OR ({time_col} >= p.mom_start AND {time_col} < p.cur_start)
-      OR ({time_col} >= p.yoy_start AND {time_col} < p.yoy_end)
-    )
-    {dept_where}
-    {dim_where}{extra}
-    {code_not_empty}
-  GROUP BY {code_sql}
-),
-{scope_total_alias} AS (
-  SELECT SUM(cur_total) AS scope_cur_total
-  FROM {stats_alias}
-)
-SELECT
-  s.{code_alias},
-  s.{name_alias},
-  s.cur_total,
-  s.mom_total,
-  s.yoy_total,
-  ROUND(IF(c.scope_cur_total = 0 OR c.scope_cur_total IS NULL, 0, s.cur_total / c.scope_cur_total * 100), 2) AS share,
-  ROUND(IF(s.mom_total = 0, 0, (s.cur_total - s.mom_total) / s.mom_total * 100), 2) AS mom,
-  ROUND(IF(s.yoy_total = 0, 0, (s.cur_total - s.yoy_total) / s.yoy_total * 100), 2) AS yoy
-FROM {stats_alias} s
-CROSS JOIN {scope_total_alias} c
-WHERE s.cur_total > 0
-ORDER BY s.cur_total DESC, s.{code_alias}""".strip()
+            return f"""SELECT
+  {code_sql} AS {code_alias},
+  MAX({name_pick_sql}) AS {name_alias},
+  COUNT(*) AS cur_total
+FROM {table_name}
+WHERE {time_col} >= :date_start
+  AND {time_col} < {end_bound}{dept_where}{dim_where}{extra}
+  {code_not_empty}
+GROUP BY {code_sql}
+HAVING COUNT(*) > 0
+ORDER BY cur_total DESC, {code_alias}""".strip()
 
-        # 有单号：先每案取一个维度码（多反馈时取最近报警时间对应码），再按维度计数
-        # GROUP_CONCAT + SUBSTRING_INDEX 保证一案一期只计一次
         pick_code = (
             f"SUBSTRING_INDEX(GROUP_CONCAT({code_sql} ORDER BY {time_col} DESC SEPARATOR '|'), '|', 1)"
         )
         pick_name = (
             f"SUBSTRING_INDEX(GROUP_CONCAT({name_pick_sql} ORDER BY {time_col} DESC SEPARATOR '|'), '|', 1)"
         )
-        return f"""WITH {params_cte},
-cur_cases AS (
+        return f"""WITH cur_cases AS (
   SELECT
     {count_id} AS case_id,
     {pick_code} AS {code_alias},
     {pick_name} AS {name_alias}
   FROM {table_name}
-  CROSS JOIN params p
-  WHERE {time_col} >= p.cur_start AND {time_col} < p.cur_end
-    {dept_where}
-    {dim_where}{extra}
+  WHERE {time_col} >= :date_start
+    AND {time_col} < {end_bound}{dept_where}{dim_where}{extra}
     {code_not_empty}
     AND {count_id} IS NOT NULL
     AND TRIM(CAST({count_id} AS CHAR)) <> ''
   GROUP BY {count_id}
-),
-mom_cases AS (
-  SELECT
-    {count_id} AS case_id,
-    {pick_code} AS {code_alias}
-  FROM {table_name}
-  CROSS JOIN params p
-  WHERE {time_col} >= p.mom_start AND {time_col} < p.cur_start
-    {dept_where}
-    {dim_where}{extra}
-    {code_not_empty}
-    AND {count_id} IS NOT NULL
-    AND TRIM(CAST({count_id} AS CHAR)) <> ''
-  GROUP BY {count_id}
-),
-yoy_cases AS (
-  SELECT
-    {count_id} AS case_id,
-    {pick_code} AS {code_alias}
-  FROM {table_name}
-  CROSS JOIN params p
-  WHERE {time_col} >= p.yoy_start AND {time_col} < p.yoy_end
-    {dept_where}
-    {dim_where}{extra}
-    {code_not_empty}
-    AND {count_id} IS NOT NULL
-    AND TRIM(CAST({count_id} AS CHAR)) <> ''
-  GROUP BY {count_id}
-),
-cur_stats AS (
-  SELECT
-    {code_alias},
-    MAX({name_alias}) AS {name_alias},
-    COUNT(*) AS cur_total
-  FROM cur_cases
-  GROUP BY {code_alias}
-),
-mom_stats AS (
-  SELECT
-    {code_alias},
-    COUNT(*) AS mom_total
-  FROM mom_cases
-  GROUP BY {code_alias}
-),
-yoy_stats AS (
-  SELECT
-    {code_alias},
-    COUNT(*) AS yoy_total
-  FROM yoy_cases
-  GROUP BY {code_alias}
-),
-{scope_total_alias} AS (
-  SELECT SUM(cur_total) AS scope_cur_total
-  FROM cur_stats
 )
 SELECT
-  c.{code_alias},
-  c.{name_alias},
-  c.cur_total,
-  COALESCE(m.mom_total, 0) AS mom_total,
-  COALESCE(y.yoy_total, 0) AS yoy_total,
-  ROUND(IF(t.scope_cur_total = 0 OR t.scope_cur_total IS NULL, 0, c.cur_total / t.scope_cur_total * 100), 2) AS share,
-  ROUND(IF(COALESCE(m.mom_total, 0) = 0, 0, (c.cur_total - COALESCE(m.mom_total, 0)) / m.mom_total * 100), 2) AS mom,
-  ROUND(IF(COALESCE(y.yoy_total, 0) = 0, 0, (c.cur_total - COALESCE(y.yoy_total, 0)) / y.yoy_total * 100), 2) AS yoy
-FROM cur_stats c
-LEFT JOIN mom_stats m ON m.{code_alias} = c.{code_alias}
-LEFT JOIN yoy_stats y ON y.{code_alias} = c.{code_alias}
-CROSS JOIN {scope_total_alias} t
-WHERE c.cur_total > 0
-ORDER BY c.cur_total DESC, c.{code_alias}""".strip()
+  {code_alias},
+  MAX({name_alias}) AS {name_alias},
+  COUNT(*) AS cur_total
+FROM cur_cases
+GROUP BY {code_alias}
+HAVING COUNT(*) > 0
+ORDER BY cur_total DESC, {code_alias}""".strip()
 
     @classmethod
     def build_dim_combo_sql(
@@ -1188,6 +1046,9 @@ ORDER BY cur_total DESC, {', '.join(group_parts)}""".strip()
         filter_self_received: bool = False,
         exclude_self_received: bool = False,
         extra_where: str = '',
+        dept_code: str | None = None,
+        dim_values: dict[str, str] | None = None,
+        date_end: str | None = None,
     ) -> str:
         """按类别代码分组：当期量、同比、占范围内全部类别比重。"""
         code_expr, name_expr = cls.resolve_category_group_exprs(columns, data_source)
@@ -1211,6 +1072,9 @@ ORDER BY cur_total DESC, {', '.join(group_parts)}""".strip()
             filter_self_received=filter_self_received,
             exclude_self_received=exclude_self_received,
             extra_where=extra_where,
+            dept_code=dept_code,
+            dim_values=dim_values,
+            date_end=date_end,
         )
 
     @classmethod
@@ -1231,6 +1095,9 @@ ORDER BY cur_total DESC, {', '.join(group_parts)}""".strip()
         filter_self_received: bool = False,
         exclude_self_received: bool = False,
         extra_where: str = '',
+        dept_code: str | None = None,
+        dim_values: dict[str, str] | None = None,
+        date_end: str | None = None,
     ) -> str:
         """按类型代码分组：当期量、同比、占范围内全部类型比重。"""
         code_expr, name_expr = cls.resolve_type_group_exprs(columns, data_source)
@@ -1254,6 +1121,9 @@ ORDER BY cur_total DESC, {', '.join(group_parts)}""".strip()
             filter_self_received=filter_self_received,
             exclude_self_received=exclude_self_received,
             extra_where=extra_where,
+            dept_code=dept_code,
+            dim_values=dim_values,
+            date_end=date_end,
         )
 
     @classmethod
@@ -1274,6 +1144,9 @@ ORDER BY cur_total DESC, {', '.join(group_parts)}""".strip()
         filter_self_received: bool = False,
         exclude_self_received: bool = False,
         extra_where: str = '',
+        dept_code: str | None = None,
+        dim_values: dict[str, str] | None = None,
+        date_end: str | None = None,
     ) -> str:
         """按细类代码分组：当期量、同比、占范围内全部细类比重。"""
         code_expr, name_expr = cls.resolve_subtype_group_exprs(columns, data_source)
@@ -1297,6 +1170,9 @@ ORDER BY cur_total DESC, {', '.join(group_parts)}""".strip()
             filter_self_received=filter_self_received,
             exclude_self_received=exclude_self_received,
             extra_where=extra_where,
+            dept_code=dept_code,
+            dim_values=dim_values,
+            date_end=date_end,
         )
 
     # ------------------------------------------------------------------
@@ -1737,7 +1613,7 @@ ORDER BY today_cnt DESC, unit_name ASC""".strip()
         *,
         columns: set[str],
         data_source: str,
-        dept_prefix_len: int = 5,
+        dept_prefix_len: int = 6,
         dept_col: str | None = None,
     ) -> dict[str, Any]:
         """地区表：部门列、去重键、LEFT 位数。
@@ -1745,7 +1621,7 @@ ORDER BY today_cnt DESC, unit_name ASC""".strip()
         dept_col 应由总量口径传入（无维 fkdwdm / 有维 txfkdwdm），避免地区与总量分叉。
         """
         is_jjd = 'jjd' in (data_source or '').lower()
-        prefix_len = 6 if int(dept_prefix_len) >= 6 else 5
+        prefix_len = 6
         override = str(dept_col or '').strip()
         if is_jjd:
             resolved_dept = (
@@ -1823,7 +1699,7 @@ ORDER BY today_cnt DESC, unit_name ASC""".strip()
         dim_filters: dict[str, str],
         columns: set[str],
         dept_col: str | None = None,
-        dept_prefix_len: int = 5,
+        dept_prefix_len: int = 6,
         filter_duplicate: bool = False,
         exclude_non_police: bool = False,
         exclude_traffic: bool = False,
@@ -1832,10 +1708,11 @@ ORDER BY today_cnt DESC, unit_name ASC""".strip()
         extra_where: str = '',
         include_squad_brigade: bool = False,
     ) -> str:
-        """地区表：对齐业务参考 SQL（cur/mom/yoy UNION + jz_dept 单位名 + 全市行）。
+        """地区表：只查当期量 + jz_dept 单位名 + 全市行。
 
-        返回列：unit_code, unit_name, today_cnt, mom_cnt, yoy_cnt
+        返回列：unit_code, unit_name, today_cnt, mom_cnt=0, yoy_cnt=0
         （unit_code='00' 为全市 DISTINCT 总量，勿用各所相加）。
+        同比/环比由 service 另查基期后程序合并。
         include_squad_brigade=True（交通类别）时保留中队/大队，仍排除分局/市局/指挥中心。
         """
         scope = cls._resolve_alarm_unit_scope(
@@ -1862,7 +1739,7 @@ ORDER BY today_cnt DESC, unit_name ASC""".strip()
             time_col=time_col,
             extra_where=extra_where,
         )
-        # 与 build_total_sql 同一套 DATETIME 时间窗（勿 CAST AS DATE，否则非 0 点会多算）
+        # 只查传入时间窗的当期量；同比/环比由 service 另查基期后程序合并
         end_excl = DATE_END_EXCLUSIVE_EXPR
         dept_where = f"""
       AND (
@@ -1874,17 +1751,6 @@ ORDER BY today_cnt DESC, unit_name ASC""".strip()
             )
           )
       AND b.{dept_col} IS NOT NULL"""
-
-        def period_block(period_code: str, start_col: str, end_col: str) -> str:
-            return f"""SELECT '{period_code}' AS period_code,
-           b.{dept_col} AS unit_code,
-           {unit_name_expr} AS unit_name,
-           {dedup_key} AS dedup_key
-    FROM {table_name} b
-    LEFT JOIN jz_dept d ON b.{dept_col} = d.dept_code AND d.del_flag = '0'
-    CROSS JOIN params p
-    WHERE b.{time_col} >= p.{start_col}
-      AND b.{time_col} < p.{end_col}{dim_where}{extra}{dept_where}"""
 
         # 默认排除中队/大队；交通类别需保留（仍排除分局/市局/指挥中心）
         unit_name_exclude = [
@@ -1900,36 +1766,26 @@ ORDER BY today_cnt DESC, unit_name ASC""".strip()
             ]
         unit_name_exclude_sql = '\n    '.join(unit_name_exclude)
 
-        return f"""WITH params AS (
+        return f"""WITH period_rows AS (
   SELECT
-    CAST(:date_start AS DATETIME) AS start_date,
-    {end_excl} AS end_date,
-    DATE_SUB(
-      CAST(:date_start AS DATETIME),
-      INTERVAL TIMESTAMPDIFF(
-        SECOND,
-        CAST(:date_start AS DATETIME),
-        {end_excl}
-      ) SECOND
-    ) AS prev_start_date,
-    CAST(:date_start AS DATETIME) AS prev_end_date,
-    DATE_SUB(CAST(:date_start AS DATETIME), INTERVAL 1 YEAR) AS last_year_start_date,
-    DATE_SUB({end_excl}, INTERVAL 1 YEAR) AS last_year_end_date
-),
-period_rows AS (
-  {period_block('cur', 'start_date', 'end_date')}
-  UNION ALL
-  {period_block('mom', 'prev_start_date', 'prev_end_date')}
-  UNION ALL
-  {period_block('yoy', 'last_year_start_date', 'last_year_end_date')}
+    b.{dept_col} AS unit_code,
+    {unit_name_expr} AS unit_name,
+    {dedup_key} AS dedup_key
+  FROM {table_name} b
+  LEFT JOIN jz_dept d
+    ON CAST(b.{dept_col} AS CHAR) COLLATE utf8mb4_unicode_ci
+     = CAST(d.dept_code AS CHAR) COLLATE utf8mb4_unicode_ci
+   AND d.del_flag = '0'
+  WHERE b.{time_col} >= CAST(:date_start AS DATETIME)
+    AND b.{time_col} < {end_excl}{dim_where}{extra}{dept_where}
 ),
 station_stat AS (
   SELECT
     unit_code,
     MAX(unit_name) AS unit_name,
-    COUNT(DISTINCT CASE WHEN period_code = 'cur' THEN dedup_key END) AS today_cnt,
-    COUNT(DISTINCT CASE WHEN period_code = 'mom' THEN dedup_key END) AS mom_cnt,
-    COUNT(DISTINCT CASE WHEN period_code = 'yoy' THEN dedup_key END) AS yoy_cnt
+    COUNT(DISTINCT dedup_key) AS today_cnt,
+    0 AS mom_cnt,
+    0 AS yoy_cnt
   FROM period_rows
   WHERE unit_name IS NOT NULL
     AND TRIM(unit_name) <> ''
@@ -1940,9 +1796,9 @@ all_stat AS (
   SELECT
     '00' AS unit_code,
     '全市' AS unit_name,
-    COUNT(DISTINCT CASE WHEN period_code = 'cur' THEN dedup_key END) AS today_cnt,
-    COUNT(DISTINCT CASE WHEN period_code = 'mom' THEN dedup_key END) AS mom_cnt,
-    COUNT(DISTINCT CASE WHEN period_code = 'yoy' THEN dedup_key END) AS yoy_cnt
+    COUNT(DISTINCT dedup_key) AS today_cnt,
+    0 AS mom_cnt,
+    0 AS yoy_cnt
   FROM period_rows
 ),
 merged_stat AS (
@@ -1982,9 +1838,11 @@ LIMIT 500""".strip()
         filter_self_received: bool = False,
         exclude_self_received: bool = False,
         extra_where: str = '',
+        date_end: str | None = None,
     ) -> str:
-        """按派出所 + 类别/类型分组：当期量、同比量、同比%。
+        """按派出所 + 类别/类型分组：只查当期量。
 
+        同比量/同比%由 service 另查基期后程序合并。
         station_param_keys 非空时：dept IN (:k0, :k1, ...)；空则强制无结果。
         维度过滤全部跳过（拆该所下全部类别/类型）。
         """
@@ -2021,63 +1879,26 @@ LIMIT 500""".strip()
             time_col=time_col,
             extra_where=extra_where,
         )
-
+        end_bound = date_end_bound_expr(date_end)
         if count_id == '*':
-            cur_expr = f'SUM(CASE WHEN {time_col} >= p.cur_start AND {time_col} < p.cur_end THEN 1 ELSE 0 END)'
-            yoy_expr = f'SUM(CASE WHEN {time_col} >= p.yoy_start AND {time_col} < p.yoy_end THEN 1 ELSE 0 END)'
+            total_expr = 'COUNT(*)'
         else:
-            cur_expr = (
-                f'COUNT(DISTINCT CASE WHEN {time_col} >= p.cur_start AND {time_col} < p.cur_end '
-                f'THEN {count_id} END)'
-            )
-            yoy_expr = (
-                f'COUNT(DISTINCT CASE WHEN {time_col} >= p.yoy_start AND {time_col} < p.yoy_end '
-                f'THEN {count_id} END)'
-            )
+            total_expr = f'COUNT(DISTINCT {count_id})'
 
-        return f"""WITH params AS (
-  SELECT
-    CAST(:date_start AS DATETIME) AS cur_start,
-    CASE
-      WHEN CHAR_LENGTH(:date_end) <= 10 THEN DATE_ADD(:date_end, INTERVAL 1 DAY)
-      ELSE DATE_ADD(:date_end, INTERVAL 1 SECOND)
-    END AS cur_end,
-    DATE_SUB(CAST(:date_start AS DATETIME), INTERVAL 1 YEAR) AS yoy_start,
-    DATE_SUB(
-      CASE
-        WHEN CHAR_LENGTH(:date_end) <= 10 THEN DATE_ADD(:date_end, INTERVAL 1 DAY)
-        ELSE DATE_ADD(:date_end, INTERVAL 1 SECOND)
-      END,
-      INTERVAL 1 YEAR
-    ) AS yoy_end
-),
-dim_stats AS (
-  SELECT
-    TRIM(CAST({dept_expr} AS CHAR)) AS unit_code,
-    {dim_code_sql} AS {code_alias},
-    {dim_name_sql} AS {name_alias},
-    {cur_expr} AS cur_total,
-    {yoy_expr} AS yoy_total
-  FROM {table_name}
-  CROSS JOIN params p
-  WHERE
-    (
-      ({time_col} >= p.cur_start AND {time_col} < p.cur_end)
-      OR ({time_col} >= p.yoy_start AND {time_col} < p.yoy_end)
-    )
-    {dept_where}{extra}
-    AND {dept_expr} IS NOT NULL
-    AND {code_expr} IS NOT NULL
-    AND TRIM(CAST({code_expr} AS CHAR)) <> ''
-  GROUP BY TRIM(CAST({dept_expr} AS CHAR)), {dim_code_sql}
-)
-SELECT
-  unit_code,
-  {code_alias},
-  {name_alias},
-  cur_total,
-  yoy_total,
-  ROUND(IF(yoy_total = 0, NULL, (cur_total - yoy_total) / yoy_total * 100), 2) AS yoy
-FROM dim_stats
-WHERE cur_total > 0
+        return f"""SELECT
+  TRIM(CAST({dept_expr} AS CHAR)) AS unit_code,
+  {dim_code_sql} AS {code_alias},
+  {dim_name_sql} AS {name_alias},
+  {total_expr} AS cur_total,
+  0 AS yoy_total,
+  NULL AS yoy
+FROM {table_name}
+WHERE {time_col} >= :date_start
+  AND {time_col} < {end_bound}
+  {dept_where}{extra}
+  AND {dept_expr} IS NOT NULL
+  AND {code_expr} IS NOT NULL
+  AND TRIM(CAST({code_expr} AS CHAR)) <> ''
+GROUP BY TRIM(CAST({dept_expr} AS CHAR)), {dim_code_sql}
+HAVING {total_expr} > 0
 ORDER BY unit_code, cur_total DESC, {code_alias}""".strip()

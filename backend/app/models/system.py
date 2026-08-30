@@ -25,7 +25,13 @@ class User(Base):
 class StatisticsDictionaryExclusion(Base):
     __tablename__ = "statistics_dictionary_exclusions"
     __table_args__ = (
-        UniqueConstraint("source", "level", "code", name="uq_statistics_dictionary_exclusion"),
+        UniqueConstraint(
+            "created_by",
+            "source",
+            "level",
+            "code",
+            name="uq_statistics_dictionary_exclusion_user",
+        ),
         {"mysql_charset": "utf8mb4", "mysql_collate": "utf8mb4_unicode_ci"},
     )
 
@@ -33,7 +39,8 @@ class StatisticsDictionaryExclusion(Base):
     source: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     level: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     code: Mapped[str] = mapped_column(String(32), nullable=False)
-    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # 账号维度：每位用户各自一份排除配置
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=local_now)
 
 

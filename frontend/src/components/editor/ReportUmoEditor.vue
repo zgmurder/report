@@ -79,6 +79,7 @@ let reconcilingQueryBlocks = false
 const REPORT_QUERY_BLOCK_MIME = 'application/vnd.yw-report-query-block+json'
 const REPORT_METRIC_VALUE_MIME = 'application/vnd.yw-report-metric-value'
 const REPORT_METRIC_TREND_MIME = 'application/vnd.yw-report-metric-trend'
+const REPORT_METRIC_HTML_MIME = 'application/vnd.yw-report-metric-html'
 const NUMBER_PATTERN = /[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?/g
 const TREND_PATTERN = /(?:上升|下降|持平)(?:\d+(?:\.\d+)?%)?/g
 
@@ -452,6 +453,15 @@ function readDraggedMetricValue(event: DragEvent) {
   return null
 }
 
+function readDraggedMetricHtml(event: DragEvent) {
+  const custom = event.dataTransfer?.getData(REPORT_METRIC_HTML_MIME)?.trim()
+  if (custom) return custom
+  if (dataTransferHasType(event.dataTransfer?.types, REPORT_METRIC_HTML_MIME)) {
+    return event.dataTransfer?.getData('text/html')?.trim() || null
+  }
+  return null
+}
+
 function findPatternRangeAroundPos(
   doc: { resolve: (pos: number) => any; content: { size: number } },
   pos: number,
@@ -592,13 +602,28 @@ const reportQueryBlockExtension = Node.create({
             dragover(_view, event) {
               const dragEvent = event as DragEvent
               const types = dragEvent.dataTransfer?.types
-              if (!dataTransferHasType(types, REPORT_METRIC_VALUE_MIME) && !dataTransferHasType(types, REPORT_QUERY_BLOCK_MIME)) return false
+              if (
+                !dataTransferHasType(types, REPORT_METRIC_VALUE_MIME) &&
+                !dataTransferHasType(types, REPORT_METRIC_HTML_MIME) &&
+                !dataTransferHasType(types, REPORT_QUERY_BLOCK_MIME)
+              ) {
+                return false
+              }
               dragEvent.preventDefault()
               dragEvent.dataTransfer!.dropEffect = 'copy'
               return true
             },
             drop(view, event) {
               const dragEvent = event as DragEvent
+              const metricHtml = readDraggedMetricHtml(dragEvent)
+              if (metricHtml) {
+                dragEvent.preventDefault()
+                dragEvent.stopPropagation()
+                const dropPos =
+                  view.posAtCoords({ left: dragEvent.clientX, top: dragEvent.clientY })?.pos ??
+                  editor.state.selection.from
+                return editor.commands.insertContentAt(dropPos, metricHtml)
+              }
               const metricValue = readDraggedMetricValue(dragEvent)
               if (metricValue) {
                 dragEvent.preventDefault()

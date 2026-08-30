@@ -30,6 +30,8 @@ const sources = ref<StatisticsDictionarySource[]>([])
 const activeSource = ref<'jjd_jjd' | 'fkd_fkd'>('jjd_jjd')
 const activeLevel = ref<'category' | 'type' | 'detail'>('category')
 const keyword = ref('')
+const extractText = ref('')
+const extractHint = ref('')
 const enabled = ref<Record<string, Record<'category' | 'type' | 'detail', Set<string>>>>({})
 
 const currentSource = computed(() => sources.value.find((item) => item.source === activeSource.value) || null)
@@ -55,6 +57,44 @@ const filteredRows = computed(() => {
 })
 const currentEnabled = computed(() => enabled.value[activeSource.value]?.[activeLevel.value] || new Set<string>())
 const enabledCount = computed(() => currentEnabled.value.size)
+
+/** 从报告文案拆出名称候选：普通路面事故6869起、纠纷事项1741起 → [普通路面事故, 纠纷事项] */
+function extractNameCandidates(text: string): string[] {
+  const parts = String(text || '')
+    .split(/[\n\r、，,;；|/]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+  const names: string[] = []
+  for (let part of parts) {
+    part = part.replace(/^\d+[\.．、\)\]\s]+/, '')
+    part = part.replace(/[（(][^）)]*[）)]/g, ' ')
+    part = part.replace(/\d+(\.\d+)?%?/g, ' ')
+    part = part.replace(/(同比|环比|占比|累计|升幅|降幅|持平)/g, ' ')
+    part = part.replace(/起/g, ' ')
+    part = part.replace(/[:：\-–—]+/g, ' ')
+    part = part.replace(/\s+/g, ' ').trim()
+    if (part.length >= 2) names.push(part)
+  }
+  return [...new Set(names)]
+}
+
+function matchDictionaryItem(
+  candidate: string,
+  items: SearchClassificationItem[],
+): SearchClassificationItem | null {
+  const needle = candidate.trim()
+  if (!needle) return null
+  const exact = items.find((item) => item.name.trim() === needle)
+  if (exact) return exact
+  // 最长名称优先：候选包含字典名，或字典名包含候选
+  const ranked = [...items]
+    .filter((item) => {
+      const name = item.name.trim()
+      return name.length >= 2 && (needle.includes(name) || name.includes(needle))
+    })
+    .sort((a, b) => b.name.trim().length - a.name.trim().length)
+  return ranked[0] || null
+}
 
 function initializeEnabled() {
   const next: Record<string, Record<'category' | 'type' | 'detail', Set<string>>> = {}
@@ -104,6 +144,44 @@ function setFilteredEnabled(checked: boolean) {
   enabled.value = { ...enabled.value }
 }
 
+function applyExtractFromText() {
+  const candidates = extractNameCandidates(extractText.value)
+  if (!candidates.length) {
+    extractHint.value = '未识别到名称，请粘贴如：普通路面事故6869起、纠纷事项1741起'
+    message.warning(extractHint.value)
+    return
+  }
+  const sourceSets = enabled.value[activeSource.value]
+  if (!sourceSets) return
+  const items = levelItems.value
+  const next = new Set(sourceSets[activeLevel.value])
+  const matchedNames: string[] = []
+  const unmatched: string[] = []
+  for (const candidate of candidates) {
+    const hit = matchDictionaryItem(candidate, items)
+    if (hit) {
+      next.add(hit.code)
+      matchedNames.push(hit.name)
+    } else {
+      unmatched.push(candidate)
+    }
+  }
+  sourceSets[activeLevel.value] = next
+  enabled.value = { ...enabled.value }
+  const uniqueMatched = [...new Set(matchedNames)]
+  if (uniqueMatched.length) {
+    extractHint.value = `已勾选 ${uniqueMatched.length} 项：${uniqueMatched.join('、')}${
+      unmatched.length ? `；未匹配 ${unmatched.length} 项：${unmatched.join('、')}` : ''
+    }`
+    message.success(`已从内容勾选 ${uniqueMatched.length} 项`)
+  } else {
+    extractHint.value = `当前「${
+      activeLevel.value === 'category' ? '类别' : activeLevel.value === 'type' ? '类型' : '细类'
+    }」下未匹配到字典项。可切换层级后再点提取。未识别：${unmatched.join('、')}`
+    message.warning('当前层级未匹配到字典项，可切换类别/类型/细类后再提取')
+  }
+}
+
 async function save() {
   saving.value = true
   try {
@@ -129,9 +207,16 @@ async function save() {
 }
 
 watch(() => props.show, (show) => {
-  if (show) loadConfig()
+  if (show) {
+    extractText.value = ''
+    extractHint.value = ''
+    loadConfig()
+  }
 })
-watch([activeSource, activeLevel], () => { keyword.value = '' })
+watch([activeSource, activeLevel], () => {
+  keyword.value = ''
+  extractHint.value = ''
+})
 </script>
 
 <template>
@@ -144,7 +229,7 @@ watch([activeSource, activeLevel], () => { keyword.value = '' })
     @update:show="emit('update:show', $event)"
   >
     <n-spin :show="loading">
-      <div class="config-tip">勾选的字典项参与全局统计；取消勾选后，将从搜索选项和统计结果中排除。</div>
+      <div class="config-tip">勾选的字典项参与当前账号的统计与搜索选项；取消勾选后，仅对本账号生效，不影响其他用户。</div>
       <n-tabs v-model:value="activeSource" type="segment" animated>
         <n-tab-pane v-for="source in sources" :key="source.source" :name="source.source">
           <template #tab>{{ source.name || source.source }}</template>
@@ -155,6 +240,27 @@ watch([activeSource, activeLevel], () => { keyword.value = '' })
         <n-tab-pane name="type"><template #tab>类型</template></n-tab-pane>
         <n-tab-pane name="detail"><template #tab>细类</template></n-tab-pane>
       </n-tabs>
+
+      <div class="extract-box">
+        <div class="extract-box__head">
+          <span class="extract-box__title">从内容提取</span>
+          <n-space :wrap="false" :size="8">
+            <n-button size="small" quaternary :disabled="!extractText.trim()" @click="extractText = ''; extractHint = ''">
+              清空
+            </n-button>
+            <n-button size="small" type="primary" :disabled="!extractText.trim()" @click="applyExtractFromText">
+              提取并勾选
+            </n-button>
+          </n-space>
+        </div>
+        <n-input
+          v-model:value="extractText"
+          type="textarea"
+          :rows="3"
+          placeholder="粘贴统计文案，例如：普通路面事故6869起、纠纷事项1741起、其他1285起、其他非警务723起"
+        />
+        <div v-if="extractHint" class="extract-box__hint">{{ extractHint }}</div>
+      </div>
 
       <div class="config-toolbar">
         <n-input v-model:value="keyword" clearable placeholder="搜索名称或代码" />
@@ -204,9 +310,13 @@ watch([activeSource, activeLevel], () => { keyword.value = '' })
 :global(.dictionary-modal) { width: min(820px, calc(100vw - 40px)); }
 .config-tip { margin-bottom: 14px; padding: 10px 12px; color: #606266; background: #f5f8fc; border: 1px solid #e4edf8; border-radius: 6px; font-size: 12px; line-height: 1.6; }
 .level-tabs { margin-top: 8px; }
+.extract-box { margin-bottom: 12px; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafbfc; }
+.extract-box__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.extract-box__title { color: #303133; font-size: 13px; font-weight: 600; }
+.extract-box__hint { margin-top: 8px; color: #606266; font-size: 12px; line-height: 1.5; word-break: break-all; }
 .config-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 12px; align-items: center; margin-bottom: 10px; }
 .config-summary { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: #606266; font-size: 12px; }
-.checkbox-list { height: 430px; padding: 6px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafbfc; }
+.checkbox-list { height: 360px; padding: 6px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafbfc; }
 .checkbox-row { height: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .checkbox-item { min-width: 0; height: 36px; padding: 0 9px; display: flex; align-items: center; gap: 8px; border-radius: 4px; background: #fff; cursor: pointer; }
 .checkbox-item:hover { background: #edf6ff; }

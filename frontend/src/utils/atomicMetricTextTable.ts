@@ -34,15 +34,14 @@ export function isAtomicMetricListTableField(field: string): field is AtomicList
   return LIST_TABLE_FIELDS.has(field)
 }
 
-/** 列表类字段且有内容时即可展示切换按钮（解析失败时再提示） */
+/** 列表类字段且有不少于 2 条可解析项时展示表格切换 */
 export function canShowAtomicMetricTableToggle(field: string, text: string): boolean {
-  const raw = String(text || '').trim()
-  if (!raw || raw === '无') return false
-  return isAtomicMetricListTableField(field)
+  const table = parseAtomicMetricListToTable(field, text)
+  return Boolean(table && table.rows.length >= 2)
 }
 
 export function canConvertAtomicMetricToTable(field: string, text: string): boolean {
-  return Boolean(parseAtomicMetricListToTable(field, text))
+  return canShowAtomicMetricTableToggle(field, text)
 }
 
 /**
@@ -153,7 +152,7 @@ export function transposeAtomicListTable(table: AtomicListTable): AtomicListTabl
 }
 
 /**
- * 解析列表文案为表格；transpose=true 时做左栏/表头互换（转表格2）
+ * 解析列表文案为表格；mode=table2 时做左栏/表头互换（名称在头部）
  */
 export function parseAtomicMetricListToTableMode(
   field: string,
@@ -161,9 +160,39 @@ export function parseAtomicMetricListToTableMode(
   mode: 'table' | 'table2' = 'table'
 ): AtomicListTable | null {
   const parsed = parseAtomicMetricListToTable(field, text)
-  if (!parsed) return null
+  if (!parsed || parsed.rows.length < 2) return null
   if (mode === 'table2') return transposeAtomicListTable(parsed)
   return parsed
+}
+
+/** 将表格转为可插入编辑器的 HTML */
+export function formatAtomicListTableToHtml(table: AtomicListTable): string {
+  const headers = (table.headers || []).map((h) => String(h ?? '').trim())
+  const rows = (table.rows || []).map((row) => (row || []).map((cell) => String(cell ?? '').trim()))
+  if (!headers.length || !rows.length) return ''
+  const th = headers
+    .map(
+      (h) =>
+        `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;text-align:left;">${escapeHtml(h)}</th>`,
+    )
+    .join('')
+  const body = rows
+    .map(
+      (row) =>
+        `<tr>${headers
+          .map((_, i) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(row[i] ?? '')}</td>`)
+          .join('')}</tr>`,
+    )
+    .join('')
+  return `<table style="width:100%;border-collapse:collapse;margin:8px 0;"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table>`
+}
+
+function escapeHtml(value: string): string {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function nameHeader(field: AtomicListTableField): string {
@@ -301,7 +330,7 @@ function buildCountExtraTable(
 }
 
 function parseDimShare(field: AtomicListTableField, text: string): AtomicListTable | null {
-  const parts = splitOutsideParens(text, '、；;')
+  const parts = splitOutsideParens(text, '、，,；;')
   if (!parts.length) return null
 
   const rows: Array<{ name: string; count: string; extras: CountItemExtras }> = []

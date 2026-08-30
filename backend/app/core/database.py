@@ -81,6 +81,68 @@ def init_db() -> None:
             if html_snapshot_type and html_snapshot_type.lower() != "longtext":
                 conn.execute(text("ALTER TABLE report_documents MODIFY COLUMN html_snapshot LONGTEXT NULL"))
 
+            # 统计字典排除项：从全局改为按账号隔离
+            dict_table = "statistics_dictionary_exclusions"
+            has_dict_table = conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name"
+                ),
+                {"table_name": dict_table},
+            ).scalar()
+            if has_dict_table:
+                old_uq = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name "
+                        "AND INDEX_NAME = 'uq_statistics_dictionary_exclusion'"
+                    ),
+                    {"table_name": dict_table},
+                ).scalar()
+                if old_uq:
+                    conn.execute(text(f"ALTER TABLE {dict_table} DROP INDEX uq_statistics_dictionary_exclusion"))
+                default_owner = conn.execute(
+                    text("SELECT id FROM sys_users WHERE status = 'enabled' ORDER BY id ASC LIMIT 1")
+                ).scalar()
+                if default_owner:
+                    conn.execute(
+                        text(
+                            f"UPDATE {dict_table} SET created_by = :user_id "
+                            "WHERE created_by IS NULL"
+                        ),
+                        {"user_id": default_owner},
+                    )
+                # 无主数据无法归属账号，直接清理
+                conn.execute(text(f"DELETE FROM {dict_table} WHERE created_by IS NULL"))
+                created_by_nullable = conn.execute(
+                    text(
+                        "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name "
+                        "AND COLUMN_NAME = 'created_by'"
+                    ),
+                    {"table_name": dict_table},
+                ).scalar()
+                if created_by_nullable and str(created_by_nullable).upper() == "YES":
+                    conn.execute(
+                        text(f"ALTER TABLE {dict_table} MODIFY COLUMN created_by INT NOT NULL")
+                    )
+                new_uq = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name "
+                        "AND INDEX_NAME = 'uq_statistics_dictionary_exclusion_user'"
+                    ),
+                    {"table_name": dict_table},
+                ).scalar()
+                if not new_uq:
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE {dict_table} "
+                            "ADD UNIQUE INDEX uq_statistics_dictionary_exclusion_user "
+                            "(created_by, source, level, code)"
+                        )
+                    )
+
     from app.repositories.user_repository import UserRepository
 
     with SessionLocal() as db:

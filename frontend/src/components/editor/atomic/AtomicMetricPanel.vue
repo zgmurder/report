@@ -89,8 +89,15 @@ const {
   queryAtomicMetric,
   reset,
   cancel,
+  setChipViewMode,
   startMetricDrag,
 } = metric
+
+function onChipModeClick(event: MouseEvent, field: string, mode: 'text' | 'table' | 'table2') {
+  event.preventDefault()
+  event.stopPropagation()
+  setChipViewMode(field, mode)
+}
 
 watch(
   () => props.categoryOptions,
@@ -169,28 +176,31 @@ type ExtraFlagItem = {
 }
 type FlagGroup = {
   title: string
+  hint?: string
+  selectAll?: boolean
   flags?: FlagItem[]
   extras?: ExtraFlagItem[]
 }
 
 const flagGroups: FlagGroup[] = [
   {
-    title: '对比指标',
+    title: '基础指标',
+    selectAll: true,
     flags: [
       { key: 'yoy', label: '同比', title: '同比变化' },
       { key: 'mom', label: '环比', title: '环比变化' },
       { key: 'share', label: '占比', title: '当前筛选占总量比例；可与类别/类型/细类/社区/辖区联用' },
       { key: 'momCount', label: '环比数', title: '返回上期数量（环比数）' },
       { key: 'yoyCount', label: '同比数', title: '返回去年同期数量（同比数）' },
-      { key: 'cumulative', label: '累计', title: '结束时间所在年 1月1日 至结束时间的总数' },
     ],
   },
   {
     title: '拆分维度',
+    hint: '按维度分组出文案，如各类别各多少起',
     flags: [
-      { key: 'categoryShare', label: '类别', title: '按类别拆分数量' },
-      { key: 'typeShare', label: '类型', title: '按类型拆分数量' },
-      { key: 'subtypeShare', label: '细类', title: '按细类拆分数量' },
+      { key: 'categoryShare', label: '类别', title: '按类别拆分数量（与上方「筛选」不同）' },
+      { key: 'typeShare', label: '类型', title: '按类型拆分数量（与上方「筛选」不同）' },
+      { key: 'subtypeShare', label: '细类', title: '按细类拆分数量（与上方「筛选」不同）' },
       { key: 'hotCommunity', label: '社区', title: '按社区拆分数量' },
       { key: 'region', label: '辖区', title: '按派出所辖区拆分数量' },
       { key: 'hotPeriod', label: '高发时段', title: '按 2 小时跨度统计高发时段' },
@@ -224,6 +234,9 @@ const flagGroups: FlagGroup[] = [
   },
   {
     title: '分析增强',
+    flags: [
+      { key: 'cumulative', label: '累计', title: '结束时间所在年 1月1日 至结束时间的总数' },
+    ],
     extras: [
       {
         key: 'analysis',
@@ -266,6 +279,20 @@ function groupSelectedCount(group: FlagGroup): number {
     if (item.checked()) count += 1
   }
   return count
+}
+
+function groupFlagsAllOn(group: FlagGroup): boolean {
+  const items = group.flags || []
+  return items.length > 0 && items.every((item) => flags.value[item.key])
+}
+
+function toggleGroupFlagsAll(group: FlagGroup) {
+  const items = group.flags || []
+  if (!items.length) return
+  const next = !groupFlagsAllOn(group)
+  for (const item of items) {
+    setFlag(item.key, next)
+  }
 }
 
 const canQuery = computed(() => Boolean(props.range?.[0] && props.range?.[1]))
@@ -335,6 +362,7 @@ defineExpose({
       <div class="atomic-section">
         <div class="atomic-section__head">
           <span class="atomic-section__title">警情分类</span>
+          <span class="atomic-section__hint">筛选：只统计所选类别/类型/细类</span>
           <span v-if="hasFilterSelection" class="atomic-section__badge">已选</span>
         </div>
         <div class="atomic-panel__filters">
@@ -393,12 +421,23 @@ defineExpose({
       >
         <div class="atomic-section__head">
           <span class="atomic-section__title">{{ group.title }}</span>
+          <span v-if="group.hint" class="atomic-section__hint">{{ group.hint }}</span>
           <span
             v-if="groupSelectedCount(group)"
             class="atomic-section__badge atomic-section__badge--count"
           >
             {{ groupSelectedCount(group) }}
           </span>
+          <button
+            v-if="group.selectAll"
+            type="button"
+            class="atomic-section__all"
+            :class="{ 'is-on': groupFlagsAllOn(group) }"
+            :title="groupFlagsAllOn(group) ? '取消全选基础指标' : '全选基础指标'"
+            @click="toggleGroupFlagsAll(group)"
+          >
+            全部
+          </button>
         </div>
         <div class="atomic-chips-opts">
           <button
@@ -564,16 +603,65 @@ defineExpose({
             v-for="chip in atomicMetricChips"
             :key="chip.field"
             class="atomic-chip"
+            :class="{ 'atomic-chip--table': chip.dragIsHtml }"
             draggable="true"
             title="拖入文档"
             @dragstart="startMetricDrag($event, chip)"
           >
             <NIcon :component="GripVertical" class="atomic-chip__grip" :size="16" />
             <div class="atomic-chip__body">
-              <div class="atomic-chip__label">{{ chip.label }}</div>
-              <div class="atomic-chip__value">{{ chip.displayValue }}</div>
+              <div class="atomic-chip__label" :title="chip.field">{{ chip.label }}</div>
+              <div class="atomic-chip__meta">
+                <div v-if="chip.canTable" class="atomic-chip__modes" @mousedown.stop @click.stop>
+                  <button
+                    type="button"
+                    class="atomic-chip__mode"
+                    :class="{ 'is-active': (chip.viewMode || 'text') === 'text' }"
+                    title="文案"
+                    @click="onChipModeClick($event, chip.field, 'text')"
+                  >
+                    文案
+                  </button>
+                  <button
+                    type="button"
+                    class="atomic-chip__mode"
+                    :class="{ 'is-active': chip.viewMode === 'table' }"
+                    title="名称在左侧"
+                    @click="onChipModeClick($event, chip.field, 'table')"
+                  >
+                    名称在左
+                  </button>
+                  <button
+                    type="button"
+                    class="atomic-chip__mode"
+                    :class="{ 'is-active': chip.viewMode === 'table2' }"
+                    title="名称在头部"
+                    @click="onChipModeClick($event, chip.field, 'table2')"
+                  >
+                    名称在头
+                  </button>
+                </div>
+                <span class="atomic-chip__field">{{ chip.field }}</span>
+              </div>
+              <div
+                v-if="chip.dragIsHtml && chip.tableHeaders?.length && chip.tableRows?.length"
+                class="atomic-chip__table-wrap"
+              >
+                <table class="atomic-chip__table">
+                  <thead>
+                    <tr>
+                      <th v-for="(header, hi) in chip.tableHeaders" :key="`h-${hi}`">{{ header }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, ri) in chip.tableRows" :key="`r-${ri}`">
+                      <td v-for="(cell, ci) in row" :key="`c-${ri}-${ci}`">{{ cell }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-else class="atomic-chip__value">{{ chip.displayValue }}</div>
             </div>
-            <span class="atomic-chip__field">{{ chip.field }}</span>
           </div>
         </div>
         <NEmpty
@@ -682,6 +770,18 @@ defineExpose({
   font-size: 12px;
   font-weight: 600;
   color: #595959;
+  flex-shrink: 0;
+}
+
+.atomic-section__hint {
+  min-width: 0;
+  color: #bfbfbf;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .atomic-sql-btn {
@@ -804,6 +904,24 @@ defineExpose({
   font-weight: 500;
 }
 
+.atomic-section__all {
+  appearance: none;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8c8c8c;
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.atomic-section__all:hover,
+.atomic-section__all.is-on {
+  color: #1890ff;
+}
+
 .atomic-extra {
   flex-shrink: 0;
   padding: 8px 10px;
@@ -873,25 +991,105 @@ defineExpose({
 
 .atomic-chip__label {
   font-size: 11px;
+  line-height: 1.4;
   color: #8c8c8c;
+  word-break: break-word;
+}
+
+.atomic-chip__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  margin-top: 4px;
+}
+
+.atomic-chip__modes {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 1px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.atomic-chip__mode {
+  border: 0;
+  border-radius: 3px;
+  padding: 1px 5px;
+  background: transparent;
+  color: #8c8c8c;
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.atomic-chip__mode.is-active {
+  background: #1890ff;
+  color: #fff;
 }
 
 .atomic-chip__value {
-  margin-top: 2px;
+  margin-top: 4px;
   font-size: 13px;
   font-weight: 600;
   color: #262626;
   word-break: break-all;
 }
 
-.atomic-chip__field {
-  flex-shrink: 0;
-  align-self: flex-start;
-  padding: 1px 6px;
+.atomic-chip__table-wrap {
+  margin-top: 4px;
+  max-width: 100%;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid #91d5ff;
   border-radius: 4px;
   background: #fff;
-  color: #1890ff;
+}
+
+.atomic-chip__table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
   font-size: 11px;
+  line-height: 1.35;
+}
+
+.atomic-chip__table th,
+.atomic-chip__table td {
+  padding: 3px 6px;
+  border: 1px solid #e8e8e8;
+  white-space: nowrap;
+  text-align: left;
+  color: #262626;
+  font-weight: 500;
+}
+
+.atomic-chip__table th {
+  background: #f5f7fa;
+  color: #595959;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+.atomic-chip--table {
+  align-items: flex-start;
+}
+
+.atomic-chip__field {
+  margin-left: auto;
+  max-width: 100%;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #91d5ff;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .atomic-empty {

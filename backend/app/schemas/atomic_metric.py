@@ -60,6 +60,8 @@ class AtomicMetricQueryResult(BaseModel):
     mom: float | None = None
     yoy_change: str | None = None
     mom_change: str | None = None
+    yoy_count_change: str | None = None
+    mom_count_change: str | None = None
     yoy_count: int | float | None = None
     mom_count: int | float | None = None
     cumulative: int | float | None = None

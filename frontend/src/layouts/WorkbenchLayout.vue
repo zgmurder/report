@@ -17,9 +17,7 @@ const activeNavIndicatorStyle = computed(() => ({
   transform: `translateX(calc(${Math.max(activeNavIndex.value, 0) * 100}% + ${Math.max(activeNavIndex.value, 0) * 4}px))`,
 }))
 const userOptions = computed(() => [
-  ...(userStore.user?.roles.includes('admin')
-    ? [{ label: '字典配置', key: 'dictionary-config', icon: () => h(NIcon, null, { default: () => h(BookOpenCheck) }) }]
-    : []),
+  { label: '字典配置', key: 'dictionary-config', icon: () => h(NIcon, null, { default: () => h(BookOpenCheck) }) },
   { label: '退出登录', key: 'logout', icon: () => h(NIcon, null, { default: () => h(LogOut) }) },
 ])
 

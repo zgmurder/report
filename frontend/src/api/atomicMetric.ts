@@ -53,6 +53,8 @@ export interface AtomicMetricQueryResult {
   mom?: number | null
   yoy_change?: string | null
   mom_change?: string | null
+  yoy_count_change?: string | null
+  mom_count_change?: string | null
   yoy_count?: number | null
   mom_count?: number | null
   cumulative?: number | null

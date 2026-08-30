@@ -15,17 +15,18 @@ class ReportSearchRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_disabled_codes(self, source: str) -> dict[str, list[str]]:
+    def get_disabled_codes(self, source: str, user_id: int) -> dict[str, list[str]]:
         rows = self.db.execute(
             text(
                 """
                 SELECT level, code
                 FROM statistics_dictionary_exclusions
                 WHERE source = :source
+                  AND created_by = :user_id
                 ORDER BY level, code
                 """
             ),
-            {"source": source},
+            {"source": source, "user_id": user_id},
         ).mappings().all()
         result = {"category": [], "type": [], "detail": []}
         for row in rows:
@@ -35,8 +36,14 @@ class ReportSearchRepository:
 
     def replace_disabled_codes(self, source: str, disabled: dict[str, list[str]], user_id: int) -> None:
         self.db.execute(
-            text("DELETE FROM statistics_dictionary_exclusions WHERE source = :source"),
-            {"source": source},
+            text(
+                """
+                DELETE FROM statistics_dictionary_exclusions
+                WHERE source = :source
+                  AND created_by = :user_id
+                """
+            ),
+            {"source": source, "user_id": user_id},
         )
         values = [
             {"source": source, "level": level, "code": code, "created_by": user_id, "created_at": local_now()}
@@ -73,7 +80,9 @@ class ReportSearchRepository:
         sql = statements.get(level)
         return [dict(row) for row in self.db.execute(text(sql)).mappings().all()] if sql else []
 
-    def list_classifications(self, source: str, level: str, parent_code: str | None = None) -> list[dict]:
+    def list_classifications(
+        self, source: str, level: str, parent_code: str | None = None, user_id: int | None = None
+    ) -> list[dict]:
         if source == "jjd_jjd":
             if level == "category":
                 sql = """
@@ -128,7 +137,9 @@ class ReportSearchRepository:
         else:
             return []
         rows = [dict(row) for row in self.db.execute(text(sql), params).mappings().all()]
-        disabled = set(self.get_disabled_codes(source).get(level, []))
+        if user_id is None:
+            return rows
+        disabled = set(self.get_disabled_codes(source, user_id).get(level, []))
         return [row for row in rows if str(row["code"]) not in disabled]
 
     def get_department_name(self, unit_code: str | None) -> str:

@@ -44,7 +44,6 @@ class ReportSearchService:
         )
 
     def dictionary_config(self, current_user: CurrentUser) -> StatisticsDictionaryConfigResponse:
-        self._require_admin(current_user)
         sources = []
         for source, metadata in DATA_SOURCES.items():
             sources.append(
@@ -54,7 +53,7 @@ class ReportSearchService:
                     categories=[SearchClassificationItem(**row) for row in self.repository.list_all_classifications(source, "category")],
                     types=[SearchClassificationItem(**row) for row in self.repository.list_all_classifications(source, "type")],
                     details=[SearchClassificationItem(**row) for row in self.repository.list_all_classifications(source, "detail")],
-                    disabled=self.repository.get_disabled_codes(source),
+                    disabled=self.repository.get_disabled_codes(source, current_user.id),
                 )
             )
         return StatisticsDictionaryConfigResponse(sources=sources)
@@ -64,7 +63,6 @@ class ReportSearchService:
         request: StatisticsDictionaryConfigUpdate,
         current_user: CurrentUser,
     ) -> StatisticsDictionarySource:
-        self._require_admin(current_user)
         valid = {
             "category": {row["code"] for row in self.repository.list_all_classifications(request.source, "category")},
             "type": {row["code"] for row in self.repository.list_all_classifications(request.source, "type")},
@@ -89,12 +87,20 @@ class ReportSearchService:
             disabled=requested,
         )
 
-    def classifications(self, source: str, level: str, parent_code: str | None) -> SearchClassificationResponse:
+    def classifications(
+        self,
+        source: str,
+        level: str,
+        parent_code: str | None,
+        current_user: CurrentUser,
+    ) -> SearchClassificationResponse:
         if source not in {"jjd_jjd", "fkd_fkd"}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的数据源")
         if level not in {"category", "type", "detail"}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的分类层级")
-        rows = self.repository.list_classifications(source, level, parent_code)
+        rows = self.repository.list_classifications(
+            source, level, parent_code, user_id=current_user.id
+        )
         return SearchClassificationResponse(
             source=source,
             level=level,
@@ -329,11 +335,6 @@ class ReportSearchService:
     def _department(self, current_user: CurrentUser) -> SearchDepartment:
         code = current_user.unit_code or ""
         return SearchDepartment(code=code, name=self.repository.get_department_name(code))
-
-    @staticmethod
-    def _require_admin(current_user: CurrentUser) -> None:
-        if "admin" not in current_user.roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅管理员可配置统计字典")
 
     @staticmethod
     def _metric(item) -> SearchMetricItem:

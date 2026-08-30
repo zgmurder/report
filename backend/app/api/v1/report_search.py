@@ -45,9 +45,10 @@ def search_classifications(
     source: str = Query(default="jjd_jjd"),
     level: str = Query(default="category"),
     parent_code: str | None = Query(default=None),
+    current_user: CurrentUser = Depends(get_current_user),
     service: ReportSearchService = Depends(get_service),
 ):
-    return ok(service.classifications(source, level, parent_code))
+    return ok(service.classifications(source, level, parent_code, current_user))
 
 
 @router.get("/metrics")

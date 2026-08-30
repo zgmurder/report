@@ -5,10 +5,19 @@ import {
   type AtomicMetricQueryResult,
 } from '@/api/atomicMetric'
 import { applyAtomicTypeLabels } from '@/data/atomicTypeDict'
-import { mergeAtomicDimShareTables } from '@/utils/atomicMetricTextTable'
+import {
+  canShowAtomicMetricTableToggle,
+  formatAtomicListTableToHtml,
+  mergeAtomicDimShareTables,
+  parseAtomicMetricListToTableMode,
+  transposeAtomicListTable,
+} from '@/utils/atomicMetricTextTable'
 
 export const REPORT_METRIC_VALUE_MIME = 'application/vnd.yw-report-metric-value'
 export const REPORT_METRIC_TREND_MIME = 'application/vnd.yw-report-metric-trend'
+export const REPORT_METRIC_HTML_MIME = 'application/vnd.yw-report-metric-html'
+
+export type AtomicChipViewMode = 'text' | 'table' | 'table2'
 
 export type AtomicMetricChipField =
   | 'total'
@@ -16,6 +25,8 @@ export type AtomicMetricChipField =
   | 'mom'
   | 'yoy_change'
   | 'mom_change'
+  | 'yoy_count_change'
+  | 'mom_count_change'
   | 'yoy_count'
   | 'mom_count'
   | 'cumulative'
@@ -37,8 +48,15 @@ export type AtomicMetricChip = {
   label: string
   value: string | number
   displayValue: string
+  /** 原始列表文案（表格模式拖入时仍保留） */
+  textValue?: string
+  canTable?: boolean
+  viewMode?: AtomicChipViewMode
   tableHeaders?: string[]
   tableRows?: string[][]
+  /** 拖入正文的内容（文案或表格 HTML） */
+  dragPayload?: string
+  dragIsHtml?: boolean
 }
 
 export type AtomicCompareFlags = {
@@ -116,6 +134,15 @@ function isAbortError(error: unknown) {
   return false
 }
 
+function formatCountChangePhrase(current: unknown, baseline: unknown): string {
+  const cur = Number(current)
+  const base = Number(baseline)
+  if (!Number.isFinite(cur) || !Number.isFinite(base)) return ''
+  const delta = Math.round(cur - base)
+  if (delta >= 0) return `上升 ${delta} 起`
+  return `下降 ${Math.abs(delta)} 起`
+}
+
 function formatDisplay(field: AtomicMetricChipField, value: unknown) {
   const text = value === undefined || value === null ? '' : String(value)
   if (
@@ -133,7 +160,12 @@ function formatDisplay(field: AtomicMetricChipField, value: unknown) {
     if (field === 'type_share') return applyAtomicTypeLabels(text) || '无'
     return text || '无'
   }
-  if (field === 'yoy_change' || field === 'mom_change') return text || '持平'
+  if (field === 'yoy_count_change' || field === 'mom_count_change') {
+    return text || '上升 0 起'
+  }
+  if (field === 'yoy_change' || field === 'mom_change') {
+    return text || '持平'
+  }
   if (field === 'yoy_trend_top_n') return text || '0'
   if (field === 'yoy' || field === 'mom' || field === 'share') return text ? `${text}%` : '0%'
   return text || '0'
@@ -187,6 +219,8 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
   const queryResult = ref<AtomicMetricQueryResult | null>(null)
   const querying = ref(false)
   const lastError = ref('')
+  /** 多条文案芯片：文案 / 名称在左 / 名称在头 */
+  const chipViewModes = ref<Record<string, AtomicChipViewMode>>({})
   let abortController: AbortController | null = null
 
   const orgDimensionOptions = [
@@ -414,94 +448,132 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
     const result = queryResult.value
     if (!result) return []
     const fields = result.field_values || {}
-    const totalLabelParts: string[] = []
-    if (fields.exclude_non_police) totalLabelParts.push('除去非警务')
-    if (fields.exclude_traffic) totalLabelParts.push('除交通')
-    if (fields.filter_self_received) totalLabelParts.push('自接警')
-    if (fields.exclude_self_received) totalLabelParts.push('除自接警')
-    if (fields.filter_duplicate) totalLabelParts.push('重复')
+    const shareIntent = resolveShareIntent()
+    // 勾选拆分维度时，汇总芯片由维度结果承载，不再单独展示总量/同比/环比等
+    const hasSplitDimension = Boolean(
+      shareIntent.category ||
+        shareIntent.type ||
+        shareIntent.subtype ||
+        flags.value.hotCommunity ||
+        flags.value.region ||
+        flags.value.hotPeriod ||
+        (showOrgDimension.value && orgDimension.value) ||
+        showTag.value ||
+        showAnalysis.value,
+    )
 
-    const chips: AtomicMetricChip[] = [
-      {
+    const chips: AtomicMetricChip[] = []
+
+    if (!hasSplitDimension) {
+      const totalLabelParts: string[] = []
+      if (fields.exclude_non_police) totalLabelParts.push('除去非警务')
+      if (fields.exclude_traffic) totalLabelParts.push('除交通')
+      if (fields.filter_self_received) totalLabelParts.push('自接警')
+      if (fields.exclude_self_received) totalLabelParts.push('除自接警')
+      if (fields.filter_duplicate) totalLabelParts.push('重复')
+
+      chips.push({
         field: 'total',
         label: totalLabelParts.length ? `${totalLabelParts.join('')}总量` : '总量',
         value: (fields.total ?? result.total ?? 0) as string | number,
         displayValue: formatDisplay('total', fields.total ?? result.total ?? 0),
-      },
-    ]
+      })
 
-    if (flags.value.yoy) {
-      chips.push({
-        field: 'yoy',
-        label: '同比',
-        value: (fields.yoy ?? result.yoy ?? 0) as string | number,
-        displayValue: formatDisplay('yoy', fields.yoy ?? result.yoy ?? 0),
-      })
-      const yoyChange = String(fields.yoy_change ?? result.yoy_change ?? '').trim()
-      chips.push({
-        field: 'yoy_change',
-        label: '同比升降',
-        value: yoyChange || '持平',
-        displayValue: formatDisplay('yoy_change', yoyChange || '持平'),
-      })
-    }
-    if (flags.value.mom) {
-      chips.push({
-        field: 'mom',
-        label: '环比',
-        value: (fields.mom ?? result.mom ?? 0) as string | number,
-        displayValue: formatDisplay('mom', fields.mom ?? result.mom ?? 0),
-      })
-      const momChange = String(fields.mom_change ?? result.mom_change ?? '').trim()
-      chips.push({
-        field: 'mom_change',
-        label: '环比升降',
-        value: momChange || '持平',
-        displayValue: formatDisplay('mom_change', momChange || '持平'),
-      })
-    }
-    if (flags.value.yoyCount) {
-      chips.push({
-        field: 'yoy_count',
-        label: '同比数',
-        value: (fields.yoy_count ?? result.yoy_count ?? 0) as string | number,
-        displayValue: formatDisplay('yoy_count', fields.yoy_count ?? result.yoy_count ?? 0),
-      })
-    }
-    if (flags.value.momCount) {
-      chips.push({
-        field: 'mom_count',
-        label: '环比数',
-        value: (fields.mom_count ?? result.mom_count ?? 0) as string | number,
-        displayValue: formatDisplay('mom_count', fields.mom_count ?? result.mom_count ?? 0),
-      })
-    }
-    if (flags.value.cumulative) {
-      chips.push({
-        field: 'cumulative',
-        label: '累计',
-        value: (fields.cumulative ?? result.cumulative ?? 0) as string | number,
-        displayValue: formatDisplay('cumulative', fields.cumulative ?? result.cumulative ?? 0),
-      })
-    }
-
-    const shareIntent = resolveShareIntent()
-    if (
-      flags.value.share &&
-      !shareIntent.category &&
-      !shareIntent.type &&
-      !shareIntent.subtype &&
-      !flags.value.hotCommunity &&
-      !flags.value.region
-    ) {
-      const shareRaw = fields.share ?? result.share
-      if (shareRaw !== undefined && shareRaw !== null && shareRaw !== '') {
+      if (flags.value.yoy) {
         chips.push({
-          field: 'share',
-          label: fields.filter_duplicate ? '重复占比' : '占比',
-          value: shareRaw as string | number,
-          displayValue: formatDisplay('share', shareRaw),
+          field: 'yoy',
+          label: '同比',
+          value: (fields.yoy ?? result.yoy ?? 0) as string | number,
+          displayValue: formatDisplay('yoy', fields.yoy ?? result.yoy ?? 0),
         })
+        const yoyChange = String(fields.yoy_change ?? result.yoy_change ?? '').trim()
+        chips.push({
+          field: 'yoy_change',
+          label: '同比升降',
+          value: yoyChange || '持平',
+          displayValue: formatDisplay('yoy_change', yoyChange || '持平'),
+        })
+        const yoyCountChange =
+          formatCountChangePhrase(
+            fields.total ?? result.total,
+            fields.yoy_count ?? result.yoy_count,
+          ) ||
+          String(fields.yoy_count_change ?? result.yoy_count_change ?? '')
+            .trim()
+            .replace(/^持平$/, '') ||
+          '上升 0 起'
+        chips.push({
+          field: 'yoy_count_change',
+          label: '同比升降数',
+          value: yoyCountChange,
+          displayValue: formatDisplay('yoy_count_change', yoyCountChange),
+        })
+      }
+      if (flags.value.mom) {
+        chips.push({
+          field: 'mom',
+          label: '环比',
+          value: (fields.mom ?? result.mom ?? 0) as string | number,
+          displayValue: formatDisplay('mom', fields.mom ?? result.mom ?? 0),
+        })
+        const momChange = String(fields.mom_change ?? result.mom_change ?? '').trim()
+        chips.push({
+          field: 'mom_change',
+          label: '环比升降',
+          value: momChange || '持平',
+          displayValue: formatDisplay('mom_change', momChange || '持平'),
+        })
+        const momCountChange =
+          formatCountChangePhrase(
+            fields.total ?? result.total,
+            fields.mom_count ?? result.mom_count,
+          ) ||
+          String(fields.mom_count_change ?? result.mom_count_change ?? '')
+            .trim()
+            .replace(/^持平$/, '') ||
+          '上升 0 起'
+        chips.push({
+          field: 'mom_count_change',
+          label: '环比升降数',
+          value: momCountChange,
+          displayValue: formatDisplay('mom_count_change', momCountChange),
+        })
+      }
+      if (flags.value.yoyCount) {
+        chips.push({
+          field: 'yoy_count',
+          label: '同比数',
+          value: (fields.yoy_count ?? result.yoy_count ?? 0) as string | number,
+          displayValue: formatDisplay('yoy_count', fields.yoy_count ?? result.yoy_count ?? 0),
+        })
+      }
+      if (flags.value.momCount) {
+        chips.push({
+          field: 'mom_count',
+          label: '环比数',
+          value: (fields.mom_count ?? result.mom_count ?? 0) as string | number,
+          displayValue: formatDisplay('mom_count', fields.mom_count ?? result.mom_count ?? 0),
+        })
+      }
+      if (flags.value.cumulative) {
+        chips.push({
+          field: 'cumulative',
+          label: '累计',
+          value: (fields.cumulative ?? result.cumulative ?? 0) as string | number,
+          displayValue: formatDisplay('cumulative', fields.cumulative ?? result.cumulative ?? 0),
+        })
+      }
+
+      if (flags.value.share) {
+        const shareRaw = fields.share ?? result.share
+        if (shareRaw !== undefined && shareRaw !== null && shareRaw !== '') {
+          chips.push({
+            field: 'share',
+            label: fields.filter_duplicate ? '重复占比' : '占比',
+            value: shareRaw as string | number,
+            displayValue: formatDisplay('share', shareRaw),
+          })
+        }
       }
     }
 
@@ -703,8 +775,64 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
       })
     }
 
-    return chips
+    return chips.map((chip) => enrichChipWithTableMode(chip))
   })
+
+  function enrichChipWithTableMode(chip: AtomicMetricChip): AtomicMetricChip {
+    const textValue = String(chip.textValue ?? chip.displayValue ?? chip.value ?? '').trim()
+    const canTable =
+      canShowAtomicMetricTableToggle(chip.field, textValue) ||
+      Boolean(chip.tableHeaders && chip.tableHeaders.length >= 2 && chip.tableRows && chip.tableRows.length >= 2)
+    const viewMode = (chipViewModes.value[chip.field] || 'text') as AtomicChipViewMode
+    if (!canTable || viewMode === 'text') {
+      return {
+        ...chip,
+        textValue,
+        canTable,
+        viewMode: canTable ? viewMode : 'text',
+        dragPayload: textValue,
+        dragIsHtml: false,
+      }
+    }
+    let table =
+      chip.tableHeaders?.length && chip.tableRows?.length
+        ? { headers: chip.tableHeaders, rows: chip.tableRows }
+        : null
+    if (table && viewMode === 'table2') {
+      table = transposeAtomicListTable(table)
+    } else if (!table) {
+      table = parseAtomicMetricListToTableMode(
+        chip.field,
+        textValue,
+        viewMode === 'table2' ? 'table2' : 'table',
+      )
+    }
+    if (!table) {
+      return {
+        ...chip,
+        textValue,
+        canTable,
+        viewMode: 'text',
+        dragPayload: textValue,
+        dragIsHtml: false,
+      }
+    }
+    return {
+      ...chip,
+      textValue,
+      canTable: true,
+      viewMode,
+      tableHeaders: table.headers,
+      tableRows: table.rows,
+      displayValue: viewMode === 'table2' ? '表格（名称在头）' : '表格（名称在左）',
+      dragPayload: formatAtomicListTableToHtml(table),
+      dragIsHtml: true,
+    }
+  }
+
+  function setChipViewMode(field: string, mode: AtomicChipViewMode) {
+    chipViewModes.value = { ...chipViewModes.value, [field]: mode }
+  }
 
   const executedSql = computed(() => String(queryResult.value?.executed_sql || '').trim())
 
@@ -725,6 +853,7 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
     abortController = abort
     querying.value = true
     lastError.value = ''
+    chipViewModes.value = {}
     try {
       const result = await requestAtomicMetric(buildPayload(), { signal: abort.signal })
       if (abort.signal.aborted) return false
@@ -772,6 +901,7 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
     warningRuleType.value = ''
     queryResult.value = null
     lastError.value = ''
+    chipViewModes.value = {}
     // 保留类别/类型/细类多选
   }
 
@@ -780,11 +910,19 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
       event.preventDefault()
       return
     }
-    const text = chip.displayValue
+    const payload = String(chip.dragPayload ?? chip.displayValue ?? '')
+    const plain = String(chip.textValue ?? chip.displayValue ?? '')
     event.dataTransfer.effectAllowed = 'copy'
-    event.dataTransfer.setData(REPORT_METRIC_VALUE_MIME, text)
-    event.dataTransfer.setData('text/plain', text)
-    if (looksLikeTrend(text)) {
+    if (chip.dragIsHtml && payload) {
+      event.dataTransfer.setData(REPORT_METRIC_HTML_MIME, payload)
+      event.dataTransfer.setData('text/html', payload)
+      event.dataTransfer.setData(REPORT_METRIC_VALUE_MIME, plain)
+      event.dataTransfer.setData('text/plain', plain)
+      return
+    }
+    event.dataTransfer.setData(REPORT_METRIC_VALUE_MIME, payload)
+    event.dataTransfer.setData('text/plain', payload)
+    if (looksLikeTrend(payload)) {
       event.dataTransfer.setData(REPORT_METRIC_TREND_MIME, '1')
     }
   }
@@ -836,6 +974,7 @@ export function useAtomicMetric(options: UseAtomicMetricOptions = {}) {
     queryAtomicMetric,
     reset,
     cancel,
+    setChipViewMode,
     startMetricDrag,
     buildPayload,
   }
