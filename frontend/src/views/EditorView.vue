@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NCard, NForm, NFormItem, NInput, NModal, NSpace, useDialog, useMessage } from 'naive-ui'
+import { NButton, NCard, NForm, NFormItem, NInput, NModal, NSpace, NSpin, useDialog, useMessage } from 'naive-ui'
 import { downloadReportDocx, type ReportContent, type ReportEditorConfig, type ReportFolderItem, type ReportItem } from '@/api/report'
 import { executeReportSearchBatch, type ReportQueryBlock } from '@/api/reportSearch'
 import ReportAssistantSidebar from '@/components/editor/ReportAssistantSidebar.vue'
@@ -271,19 +271,36 @@ function insertHtml(fragment: string) {
   html.value = `${html.value || ''}${fragment}`
 }
 
+function formatQueryBlockCell(key: string, value: unknown) {
+  if (value === null || value === undefined) return '—'
+  const number = Number(value)
+  if (Number.isFinite(number) && ['year_on_year_rate', 'period_on_period_rate', 'proportion'].includes(key)) {
+    return `${number > 0 && key !== 'proportion' ? '+' : ''}${number.toFixed(2)}%`
+  }
+  if (Number.isFinite(number) && ['year_on_year_change', 'period_on_period_change', 'event_count'].includes(key)) {
+    return `${number > 0 && key !== 'event_count' ? '+' : ''}${number.toLocaleString('zh-CN')}`
+  }
+  return String(value)
+}
+
 function renderQueryBlock(block: ReportQueryBlock) {
   const result = block.result
   const modeLabel = block.mode === 'dynamic' ? '动态数据' : '静态数据'
   const jurisdictionSummary = result && ['jurisdiction', 'jurisdiction_yoy_summary'].includes(result.analysis_type || '')
-    ? `<p style="margin:0 0 10px;line-height:1.8;">${escapeHtml(result.summary || '')}</p><table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(['year_on_year_rate', 'period_on_period_rate', 'proportion'].includes(column.key) && row[column.key] !== null && row[column.key] !== undefined ? `${Number(row[column.key]).toFixed(2)}%` : String(row[column.key] ?? '—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+    ? `<p style="margin:0 0 10px;line-height:1.8;">${escapeHtml(result.summary || '')}</p><table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(formatQueryBlockCell(column.key, row[column.key]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+    : ''
+  const singleMetric = result?.columns.length === 1 && result.rows.length === 1
+    ? `<div style="padding:8px 0 4px;text-align:center;"><div style="color:#909399;font-size:12px;margin-bottom:4px;">${escapeHtml(result.columns[0]!.label)}</div><div style="color:#1890ff;font-size:28px;font-weight:700;line-height:1.2;">${escapeHtml(formatQueryBlockCell(result.columns[0]!.key, result.rows[0]![result.columns[0]!.key]))}</div></div>`
     : ''
   const status = block.error
     ? `<div style="color:#d03050;padding:8px 0;">更新失败：${escapeHtml(block.error)}</div>`
     : jurisdictionSummary
       ? jurisdictionSummary
-      : result?.rows.length
-        ? `<table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(String(row[column.key] ?? '—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
-      : '<div style="color:#909399;padding:8px 0;">暂无数据</div>'
+      : singleMetric
+        ? singleMetric
+        : result?.rows.length
+          ? `<table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(formatQueryBlockCell(column.key, row[column.key]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+          : '<div style="color:#909399;padding:8px 0;">暂无数据</div>'
   return `<div data-report-query-block="${escapeHtml(block.id)}" data-query-mode="${block.mode}" contenteditable="false" style="margin:12px 0;padding:12px;border:1px solid #d9e9fb;border-radius:8px;background:#f8fbff;"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><strong>${escapeHtml(block.title)}</strong><span style="color:#1890ff;font-size:12px;">${modeLabel}</span></div>${status}</div><p></p>`
 }
 
@@ -426,8 +443,11 @@ onMounted(async () => {
     />
 
     <main class="editor-center">
+      <div v-if="!editorReady" class="editor-loading">
+        <n-spin size="large" description="报告加载中..." />
+      </div>
       <ReportUmoEditor
-        v-if="editorReady"
+        v-else
         ref="editorRef"
         :key="`${reportId}-${editorVersion}`"
         v-model="html"
@@ -452,7 +472,6 @@ onMounted(async () => {
       :report-html="html"
       @generate-draft="generateDraft"
       @insert-html="insertHtml"
-      @insert-query-block="insertQueryBlock"
       @global-parameters-changed="updateGlobalParameters"
     />
 
@@ -496,6 +515,14 @@ onMounted(async () => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.editor-loading {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: #f0f2f5;
 }
 
 .folder-modal {

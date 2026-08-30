@@ -77,6 +77,10 @@ let autoSaveSequence = 0
 let reconcilingQueryBlocks = false
 
 const REPORT_QUERY_BLOCK_MIME = 'application/vnd.yw-report-query-block+json'
+const REPORT_METRIC_VALUE_MIME = 'application/vnd.yw-report-metric-value'
+const REPORT_METRIC_TREND_MIME = 'application/vnd.yw-report-metric-trend'
+const NUMBER_PATTERN = /[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?/g
+const TREND_PATTERN = /(?:上升|下降|持平)(?:\d+(?:\.\d+)?%)?/g
 
 interface UmoEditorPayload {
   html?: string
@@ -433,6 +437,101 @@ function readDraggedQueryBlock(event: DragEvent) {
   }
 }
 
+function dataTransferHasType(types: readonly string[] | DOMStringList | undefined, type: string) {
+  if (!types) return false
+  if (typeof (types as DOMStringList).contains === 'function') return (types as DOMStringList).contains(type)
+  return Array.from(types as ArrayLike<string>).includes(type)
+}
+
+function readDraggedMetricValue(event: DragEvent) {
+  const custom = event.dataTransfer?.getData(REPORT_METRIC_VALUE_MIME)?.trim()
+  if (custom) return custom
+  if (dataTransferHasType(event.dataTransfer?.types, REPORT_METRIC_VALUE_MIME)) {
+    return event.dataTransfer?.getData('text/plain')?.trim() || null
+  }
+  return null
+}
+
+function findPatternRangeAroundPos(
+  doc: { resolve: (pos: number) => any; content: { size: number } },
+  pos: number,
+  pattern: RegExp,
+) {
+  const clamped = Math.max(0, Math.min(pos, doc.content.size))
+  const tryResolve = (target: number) => {
+    try {
+      return doc.resolve(target)
+    } catch {
+      return null
+    }
+  }
+  let $pos = tryResolve(clamped)
+  if (!$pos?.parent?.isTextblock) {
+    for (const delta of [0, -1, 1, -2, 2, -4, 4, -8, 8]) {
+      const candidate = tryResolve(clamped + delta)
+      if (candidate?.parent?.isTextblock) {
+        $pos = candidate
+        break
+      }
+    }
+  }
+  if (!$pos?.parent?.isTextblock) return null
+
+  const blockStart = $pos.start()
+  let text = ''
+  $pos.parent.forEach((child: { isText?: boolean; text?: string }) => {
+    text += child.isText ? (child.text || '') : '\ufffc'
+  })
+  if (!text) return null
+
+  const offset = Math.max(0, Math.min($pos.parentOffset, text.length))
+  const matches: Array<{ start: number; end: number }> = []
+  pattern.lastIndex = 0
+  let match = pattern.exec(text)
+  while (match) {
+    matches.push({ start: match.index, end: match.index + match[0].length })
+    match = pattern.exec(text)
+  }
+  if (!matches.length) return null
+
+  const containing = matches.find((item) => offset >= item.start && offset <= item.end)
+  if (containing) return { from: blockStart + containing.start, to: blockStart + containing.end }
+
+  let best = matches[0]!
+  let bestDist = Math.min(Math.abs(offset - best.start), Math.abs(offset - best.end))
+  for (const item of matches) {
+    const dist = offset < item.start ? item.start - offset : offset > item.end ? offset - item.end : 0
+    if (dist < bestDist) {
+      best = item
+      bestDist = dist
+    }
+  }
+  if (bestDist > 12) return null
+  return { from: blockStart + best.start, to: blockStart + best.end }
+}
+
+function findNumberRangeAroundPos(doc: { resolve: (pos: number) => any; content: { size: number } }, pos: number) {
+  return findPatternRangeAroundPos(doc, pos, NUMBER_PATTERN)
+}
+
+function insertOrReplaceMetricValue(view: any, editor: any, event: DragEvent, value: string) {
+  if (event.shiftKey) {
+    const position = editor.state.selection.from
+    return editor.commands.insertContentAt(position, value)
+  }
+  const dropPos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos
+    ?? editor.state.selection.from
+  const isTrend = dataTransferHasType(event.dataTransfer?.types, REPORT_METRIC_TREND_MIME)
+    || /^(上升|下降|持平)/.test(value)
+  const range = isTrend
+    ? findPatternRangeAroundPos(view.state.doc, dropPos, TREND_PATTERN) || findNumberRangeAroundPos(view.state.doc, dropPos)
+    : findNumberRangeAroundPos(view.state.doc, dropPos)
+  if (range) {
+    return editor.commands.insertContentAt({ from: range.from, to: range.to }, value)
+  }
+  return editor.commands.insertContentAt(dropPos, value)
+}
+
 const reportQueryBlockExtension = Node.create({
   name: 'reportQueryBlock',
   group: 'block',
@@ -492,13 +591,20 @@ const reportQueryBlockExtension = Node.create({
           handleDOMEvents: {
             dragover(_view, event) {
               const dragEvent = event as DragEvent
-              if (!dragEvent.dataTransfer?.types.includes(REPORT_QUERY_BLOCK_MIME)) return false
+              const types = dragEvent.dataTransfer?.types
+              if (!dataTransferHasType(types, REPORT_METRIC_VALUE_MIME) && !dataTransferHasType(types, REPORT_QUERY_BLOCK_MIME)) return false
               dragEvent.preventDefault()
-              dragEvent.dataTransfer.dropEffect = 'copy'
+              dragEvent.dataTransfer!.dropEffect = 'copy'
               return true
             },
             drop(view, event) {
               const dragEvent = event as DragEvent
+              const metricValue = readDraggedMetricValue(dragEvent)
+              if (metricValue) {
+                dragEvent.preventDefault()
+                dragEvent.stopPropagation()
+                return insertOrReplaceMetricValue(view, editor, dragEvent, metricValue)
+              }
               const block = readDraggedQueryBlock(dragEvent)
               if (!block) return false
               dragEvent.preventDefault()

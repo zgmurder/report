@@ -263,6 +263,14 @@ function handleUserAction(key: string) {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main > * {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
 @media (max-width: 960px) {

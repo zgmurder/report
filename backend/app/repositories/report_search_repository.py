@@ -150,6 +150,7 @@ class ReportSearchRepository:
     def execute_jurisdiction_analysis(
         self, query: ReportSearchQuery, unit_code: str, scope_level: str
     ) -> tuple[list[dict], str]:
+        source = SOURCE_CONFIG[query.source]
         comparison_measures = {
             "year_on_year": ["year_on_year_rate"],
             "period_on_period": ["period_on_period_rate"],
@@ -167,10 +168,10 @@ class ReportSearchRepository:
         elif query.jurisdiction_metric == "period_on_period":
             params.update(base_start=periods["period_start"], base_end=periods["period_end"])
         conditions = [
-            "j.`fksj` >= :scan_start",
-            "j.`fksj` < :current_end",
+            f"j.`{source['time_column']}` >= :scan_start",
+            f"j.`{source['time_column']}` < :current_end",
         ]
-        self._append_classification_conditions(conditions, params, query, SOURCE_CONFIG["fkd_fkd"])
+        self._append_classification_conditions(conditions, params, query, source)
 
         if scope_level == "police_station":
             group_expression = "CAST(j.`sdpcs` AS CHAR)"
@@ -194,15 +195,15 @@ class ReportSearchRepository:
         selections = [
             f"{group_expression} AS scope_code",
             f"{name_expression} AS scope_name",
-            f"{self._period_count_expression(SOURCE_CONFIG['fkd_fkd'], ':current_start', ':current_end')} AS event_count",
+            f"{self._period_count_expression(source, ':current_start', ':current_end')} AS event_count",
         ]
         if query.jurisdiction_metric != "proportion":
             selections.append(
-                f"{self._period_count_expression(SOURCE_CONFIG['fkd_fkd'], ':base_start', ':base_end')} AS base_count"
+                f"{self._period_count_expression(source, ':base_start', ':base_end')} AS base_count"
             )
         sql = "\n".join([
             f"SELECT {', '.join(selections)}",
-            "FROM `fkd_fkd` AS j",
+            f"FROM `{source['table']}` AS j",
             joins,
             f"WHERE {' AND '.join(conditions)}",
             f"GROUP BY {group_expression}, {name_expression}",

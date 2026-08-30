@@ -192,8 +192,8 @@ class ReportSearchService:
     ) -> ReportSearchResult:
         if not current_user.unit_code:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前账号未配置部门")
-        if request.source != "fkd_fkd":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="辖区分析暂仅支持反馈单")
+        if request.source not in DATA_SOURCES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的数据源")
         scope_level = "police_station" if current_user.unit_code == "330782000000" else "community"
         scope_label = "派出所" if scope_level == "police_station" else "社区"
         started = perf_counter()

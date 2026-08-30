@@ -1,0 +1,3304 @@
+[
+  {
+    "fasqdm": "330782580140",
+    "fasqmc": "佛堂稽亭村",
+    "aliases": [
+      "佛堂稽亭村",
+      "稽亭村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "合作工作委员会"
+  },
+  {
+    "fasqdm": "330782580175",
+    "fasqmc": "佛堂寺前街村",
+    "aliases": [
+      "佛堂寺前街村",
+      "寺前街村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "合作工作委员会"
+  },
+  {
+    "fasqdm": "330782580137",
+    "fasqmc": "佛堂赵朱村",
+    "aliases": [
+      "佛堂赵朱村",
+      "赵朱村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "合作工作委员会"
+  },
+  {
+    "fasqdm": "330782580174",
+    "fasqmc": "佛堂南江村",
+    "aliases": [
+      "佛堂南江村",
+      "南江村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "合作工作委员会"
+  },
+  {
+    "fasqdm": "330782580138",
+    "fasqmc": "佛堂石楼村",
+    "aliases": [
+      "佛堂石楼村",
+      "石楼村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "合作工作委员会"
+  },
+  {
+    "fasqdm": "330782580139",
+    "fasqmc": "佛堂起鸣村",
+    "aliases": [
+      "佛堂起鸣村",
+      "起鸣村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "合作工作委员会"
+  },
+  {
+    "fasqdm": "330782580172",
+    "fasqmc": "佛堂剡溪村",
+    "aliases": [
+      "佛堂剡溪村",
+      "剡溪村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580170",
+    "fasqmc": "佛堂继成村",
+    "aliases": [
+      "佛堂继成村",
+      "继成村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580167",
+    "fasqmc": "佛堂云山村",
+    "aliases": [
+      "云山村",
+      "佛堂云山村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580166",
+    "fasqmc": "佛堂塔山村",
+    "aliases": [
+      "佛堂塔山村",
+      "塔山村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580187",
+    "fasqmc": "佛堂龙溪村",
+    "aliases": [
+      "佛堂龙溪村",
+      "龙溪村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580185",
+    "fasqmc": "佛堂团力村",
+    "aliases": [
+      "佛堂团力村",
+      "团力村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580173",
+    "fasqmc": "佛堂南王店村",
+    "aliases": [
+      "佛堂南王店村",
+      "南王店村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580171",
+    "fasqmc": "佛堂石壁村",
+    "aliases": [
+      "佛堂石壁村",
+      "石壁村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580184",
+    "fasqmc": "佛堂坑口村",
+    "aliases": [
+      "佛堂坑口村",
+      "坑口村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580169",
+    "fasqmc": "佛堂钟村村",
+    "aliases": [
+      "佛堂钟村村",
+      "钟村村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "塔山工作委员会"
+  },
+  {
+    "fasqdm": "330782580155",
+    "fasqmc": "佛堂后力山村",
+    "aliases": [
+      "佛堂后力山村",
+      "后力山村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580144",
+    "fasqmc": "佛堂前王村",
+    "aliases": [
+      "佛堂前王村",
+      "前王村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580154",
+    "fasqmc": "佛堂下前王村",
+    "aliases": [
+      "下前王村",
+      "佛堂下前王村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580138",
+    "fasqmc": "佛堂石楼村",
+    "aliases": [
+      "佛堂石楼村",
+      "楼村",
+      "石楼村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580180",
+    "fasqmc": "佛堂兴盛村",
+    "aliases": [
+      "佛堂兴盛村",
+      "兴盛村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580176",
+    "fasqmc": "佛堂张宅村",
+    "aliases": [
+      "佛堂张宅村",
+      "张宅村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580142",
+    "fasqmc": "佛堂桥西村",
+    "aliases": [
+      "佛堂桥西村",
+      "桥西村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580179",
+    "fasqmc": "佛堂翁靖村",
+    "aliases": [
+      "佛堂翁靖村",
+      "翁靖村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580141",
+    "fasqmc": "佛堂方前村",
+    "aliases": [
+      "佛堂方前村",
+      "方前村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580177",
+    "fasqmc": "佛堂宝丹村",
+    "aliases": [
+      "佛堂宝丹村",
+      "宝丹村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580145",
+    "fasqmc": "佛堂东山村",
+    "aliases": [
+      "东山村",
+      "佛堂东山村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580178",
+    "fasqmc": "佛堂朝阳村",
+    "aliases": [
+      "佛堂朝阳村",
+      "朝阳村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "王宅工作委员会"
+  },
+  {
+    "fasqdm": "330782580148",
+    "fasqmc": "佛堂雅西村",
+    "aliases": [
+      "佛堂雅西村",
+      "雅西村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "田心村",
+    "aliases": [
+      "田心村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "330782580147",
+    "fasqmc": "佛堂光明村",
+    "aliases": [
+      "佛堂光明村",
+      "光明村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "330782580156",
+    "fasqmc": "佛堂塘下洋村",
+    "aliases": [
+      "佛堂塘下洋村",
+      "塘下洋村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "330782580149",
+    "fasqmc": "佛堂鲁雅村",
+    "aliases": [
+      "佛堂鲁雅村",
+      "鲁雅村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "330782580150",
+    "fasqmc": "佛堂后塘村",
+    "aliases": [
+      "佛堂后塘村",
+      "后塘村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "330782580151",
+    "fasqmc": "佛堂新店村",
+    "aliases": [
+      "佛堂新店村",
+      "新店村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "330782580153",
+    "fasqmc": "佛堂后阳村",
+    "aliases": [
+      "佛堂后阳村",
+      "后阳村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "330782580152",
+    "fasqmc": "佛堂毛陈村",
+    "aliases": [
+      "佛堂毛陈村",
+      "毛陈村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "330782580181",
+    "fasqmc": "佛堂舟墟湖村",
+    "aliases": [
+      "佛堂舟墟湖村",
+      "舟墟湖村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "田心工作委员会"
+  },
+  {
+    "fasqdm": "330782580182",
+    "fasqmc": "佛堂倍磊村",
+    "aliases": [
+      "佛堂倍磊村",
+      "倍磊村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580162",
+    "fasqmc": "佛堂寺口村",
+    "aliases": [
+      "佛堂寺口村",
+      "寺口村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580186",
+    "fasqmc": "佛堂平望村",
+    "aliases": [
+      "佛堂平望村",
+      "平望村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580161",
+    "fasqmc": "佛堂上村村",
+    "aliases": [
+      "上村村",
+      "佛堂上村村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580164",
+    "fasqmc": "佛堂花园口村",
+    "aliases": [
+      "佛堂花园口村",
+      "花园口村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580163",
+    "fasqmc": "佛堂芦塘下村",
+    "aliases": [
+      "佛堂芦塘下村",
+      "芦塘下村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "候芹村",
+    "aliases": [
+      "候芹村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580165",
+    "fasqmc": "佛堂新塘西村",
+    "aliases": [
+      "佛堂新塘西村",
+      "新塘西村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580160",
+    "fasqmc": "佛堂金山村",
+    "aliases": [
+      "佛堂金山村",
+      "金山村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580159",
+    "fasqmc": "佛堂葛仙村",
+    "aliases": [
+      "佛堂葛仙村",
+      "葛仙村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580158",
+    "fasqmc": "佛堂泽塘村",
+    "aliases": [
+      "佛堂泽塘村",
+      "泽塘村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580183",
+    "fasqmc": "佛堂南埠头村",
+    "aliases": [
+      "佛堂南埠头村",
+      "南埠头村"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "gongjianwei",
+    "org_name": "倍磊工作委员会"
+  },
+  {
+    "fasqdm": "330782580191",
+    "fasqmc": "佛堂渡磬社区",
+    "aliases": [
+      "佛堂渡磬社区",
+      "渡磬社区"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "jingwuqu",
+    "org_name": "渡磬社区"
+  },
+  {
+    "fasqdm": "330782580190",
+    "fasqmc": "佛堂大成社区",
+    "aliases": [
+      "佛堂大成社区",
+      "大成社区"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "jingwuqu",
+    "org_name": "大成社区"
+  },
+  {
+    "fasqdm": "330782580188",
+    "fasqmc": "佛堂江北社区",
+    "aliases": [
+      "佛堂江北社区",
+      "江北社区"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "jingwuqu",
+    "org_name": "江北社区"
+  },
+  {
+    "fasqdm": "330782580189",
+    "fasqmc": "佛堂蟠龙社区",
+    "aliases": [
+      "佛堂蟠龙社区",
+      "蟠龙社区"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "jingwuqu",
+    "org_name": "蟠龙社区"
+  },
+  {
+    "fasqdm": "330782580193",
+    "fasqmc": "佛堂云黄社区",
+    "aliases": [
+      "云黄社区",
+      "佛堂云黄社区"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "jingwuqu",
+    "org_name": "云黄社区"
+  },
+  {
+    "fasqdm": "330782580194",
+    "fasqmc": "佛堂吴溪社区",
+    "aliases": [
+      "佛堂吴溪社区",
+      "吴溪社区"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "jingwuqu",
+    "org_name": "吴溪社区"
+  },
+  {
+    "fasqdm": "330782580192",
+    "fasqmc": "佛堂大士社区",
+    "aliases": [
+      "佛堂大士社区",
+      "大士社区"
+    ],
+    "station_name": "佛堂派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "jingwuqu",
+    "org_name": "大士社区"
+  },
+  {
+    "fasqdm": "330782630078",
+    "fasqmc": "苏溪胡宅社区",
+    "aliases": [
+      "胡宅社区",
+      "苏溪胡宅社区"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "jingwuqu",
+    "org_name": "苏溪胡宅社区"
+  },
+  {
+    "fasqdm": "330782630079",
+    "fasqmc": "苏溪十和里社区",
+    "aliases": [
+      "十和里社区",
+      "苏溪十和里社区"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "jingwuqu",
+    "org_name": "苏溪十和里社区"
+  },
+  {
+    "fasqdm": "330782630080",
+    "fasqmc": "苏溪东风社区",
+    "aliases": [
+      "东风社区",
+      "苏溪东风社区"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "jingwuqu",
+    "org_name": "苏溪东风社区"
+  },
+  {
+    "fasqdm": "330782630081",
+    "fasqmc": "苏溪龙祈社区",
+    "aliases": [
+      "苏溪龙祈社区",
+      "龙祈社区"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "jingwuqu",
+    "org_name": "苏溪龙祈社区"
+  },
+  {
+    "fasqdm": "330782630082",
+    "fasqmc": "苏溪苏福社区",
+    "aliases": [
+      "苏溪苏福社区",
+      "苏福社区"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "jingwuqu",
+    "org_name": "苏溪苏福社区"
+  },
+  {
+    "fasqdm": "330782630083",
+    "fasqmc": "苏溪路东社区",
+    "aliases": [
+      "苏溪路东社区",
+      "路东社区"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "jingwuqu",
+    "org_name": "苏溪路东社区"
+  },
+  {
+    "fasqdm": "330782630084",
+    "fasqmc": "苏溪新院村",
+    "aliases": [
+      "新院村",
+      "苏溪新院村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "正阳共建委"
+  },
+  {
+    "fasqdm": "330782630085",
+    "fasqmc": "苏溪蒋宅村",
+    "aliases": [
+      "苏溪蒋宅村",
+      "蒋宅村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "正阳共建委"
+  },
+  {
+    "fasqdm": "330782630086",
+    "fasqmc": "苏溪后店村",
+    "aliases": [
+      "后店村",
+      "苏溪后店村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "正阳共建委"
+  },
+  {
+    "fasqdm": "330782630087",
+    "fasqmc": "苏溪马丁村",
+    "aliases": [
+      "苏溪马丁村",
+      "马丁村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "江南共建委"
+  },
+  {
+    "fasqdm": "330782630088",
+    "fasqmc": "苏溪徐丰村",
+    "aliases": [
+      "徐丰村",
+      "苏溪徐丰村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "江南共建委"
+  },
+  {
+    "fasqdm": "330782630089",
+    "fasqmc": "苏溪立塘村",
+    "aliases": [
+      "立塘村",
+      "苏溪立塘村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "江南共建委"
+  },
+  {
+    "fasqdm": "330782630090",
+    "fasqmc": "苏溪密溪村",
+    "aliases": [
+      "密溪村",
+      "苏溪密溪村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "江南共建委"
+  },
+  {
+    "fasqdm": "330782630091",
+    "fasqmc": "苏溪洪流村",
+    "aliases": [
+      "洪流村",
+      "苏溪洪流村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "江南共建委"
+  },
+  {
+    "fasqdm": "330782630092",
+    "fasqmc": "苏溪东青村",
+    "aliases": [
+      "东青村",
+      "苏溪东青村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "江南共建委"
+  },
+  {
+    "fasqdm": "330782630093",
+    "fasqmc": "苏溪杜村村",
+    "aliases": [
+      "杜村村",
+      "苏溪杜村村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "江南共建委"
+  },
+  {
+    "fasqdm": "330782630094",
+    "fasqmc": "苏溪邢宅村",
+    "aliases": [
+      "苏溪邢宅村",
+      "邢宅村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "正阳共建委"
+  },
+  {
+    "fasqdm": "330782630095",
+    "fasqmc": "苏溪新乐村",
+    "aliases": [
+      "新乐村",
+      "苏溪新乐村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "正阳共建委"
+  },
+  {
+    "fasqdm": "330782630096",
+    "fasqmc": "苏溪同春村",
+    "aliases": [
+      "同春村",
+      "苏溪同春村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "正阳共建委"
+  },
+  {
+    "fasqdm": "330782630097",
+    "fasqmc": "苏溪同裕村",
+    "aliases": [
+      "同裕村",
+      "苏溪同裕村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630098",
+    "fasqmc": "苏溪三联村",
+    "aliases": [
+      "三联村",
+      "苏溪三联村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630099",
+    "fasqmc": "苏溪联合村",
+    "aliases": [
+      "联合村",
+      "苏溪联合村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630100",
+    "fasqmc": "苏溪上楼村",
+    "aliases": [
+      "上楼村",
+      "苏溪上楼村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "正阳共建委"
+  },
+  {
+    "fasqdm": "330782630101",
+    "fasqmc": "苏溪青春村",
+    "aliases": [
+      "苏溪青春村",
+      "青春村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "正阳共建委"
+  },
+  {
+    "fasqdm": "330782630102",
+    "fasqmc": "苏溪翁界村",
+    "aliases": [
+      "翁界村",
+      "苏溪翁界村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630103",
+    "fasqmc": "苏溪下屋村",
+    "aliases": [
+      "下屋村",
+      "苏溪下屋村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630104",
+    "fasqmc": "苏溪溪北村",
+    "aliases": [
+      "溪北村",
+      "苏溪溪北村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630105",
+    "fasqmc": "苏溪花厅村",
+    "aliases": [
+      "花厅村",
+      "苏溪花厅村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630106",
+    "fasqmc": "苏溪殿下村",
+    "aliases": [
+      "殿下村",
+      "苏溪殿下村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630107",
+    "fasqmc": "苏溪龙华村",
+    "aliases": [
+      "苏溪龙华村",
+      "龙华村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "江南共建委"
+  },
+  {
+    "fasqdm": "330782630108",
+    "fasqmc": "苏溪湾头下村",
+    "aliases": [
+      "湾头下村",
+      "苏溪湾头下村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "江南共建委"
+  },
+  {
+    "fasqdm": "330782630109",
+    "fasqmc": "苏溪齐山楼村",
+    "aliases": [
+      "苏溪齐山楼村",
+      "齐山楼村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630110",
+    "fasqmc": "苏溪塘里蒋村",
+    "aliases": [
+      "塘里蒋村",
+      "苏溪塘里蒋村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "正阳共建委"
+  },
+  {
+    "fasqdm": "330782630111",
+    "fasqmc": "苏溪高岭村",
+    "aliases": [
+      "苏溪高岭村",
+      "高岭村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630112",
+    "fasqmc": "苏溪下陈村",
+    "aliases": [
+      "下陈村",
+      "苏溪下陈村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630113",
+    "fasqmc": "苏溪新厅村",
+    "aliases": [
+      "新厅村",
+      "苏溪新厅村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630114",
+    "fasqmc": "苏溪上甘村",
+    "aliases": [
+      "上甘村",
+      "苏溪上甘村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630115",
+    "fasqmc": "苏溪范家村",
+    "aliases": [
+      "苏溪范家村",
+      "范家村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630116",
+    "fasqmc": "苏溪畈田村",
+    "aliases": [
+      "畈田村",
+      "苏溪畈田村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630117",
+    "fasqmc": "苏溪上西陶村",
+    "aliases": [
+      "上西陶村",
+      "苏溪上西陶村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630118",
+    "fasqmc": "苏溪塘头应村",
+    "aliases": [
+      "塘头应村",
+      "苏溪塘头应村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630119",
+    "fasqmc": "苏溪西山下村",
+    "aliases": [
+      "苏溪西山下村",
+      "西山下村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630120",
+    "fasqmc": "苏溪东陶村",
+    "aliases": [
+      "东陶村",
+      "苏溪东陶村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630121",
+    "fasqmc": "苏溪东洪村",
+    "aliases": [
+      "东洪村",
+      "苏溪东洪村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "330782630122",
+    "fasqmc": "苏溪六都村",
+    "aliases": [
+      "六都村",
+      "苏溪六都村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "巧溪共建委"
+  },
+  {
+    "fasqdm": "330782630123",
+    "fasqmc": "苏溪苏港村",
+    "aliases": [
+      "苏港村",
+      "苏溪苏港村"
+    ],
+    "station_name": "苏溪派出所",
+    "gxdwdm": "330782630000",
+    "org_type": "gongjianwei",
+    "org_name": "联合共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "仓里",
+    "aliases": [
+      "仓里"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "长春社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "竹佳里",
+    "aliases": [
+      "竹佳里"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "长春社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "西力村",
+    "aliases": [
+      "西力村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "福田社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "共和村",
+    "aliases": [
+      "共和村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "福田社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "寺后盛村",
+    "aliases": [
+      "寺后盛村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "福田社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "联平村",
+    "aliases": [
+      "联平村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "联港社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "井畴村",
+    "aliases": [
+      "井畴村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "联港社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "思古塘",
+    "aliases": [
+      "思古塘"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "联港社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "湖塘村",
+    "aliases": [
+      "湖塘村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "通福社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "花园下村",
+    "aliases": [
+      "花园下村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "通福社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "六石塘村",
+    "aliases": [
+      "六石塘村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "通福社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "云溪村",
+    "aliases": [
+      "云溪村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "通福社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "下余新村",
+    "aliases": [
+      "下余新村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "通福社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "王牌村",
+    "aliases": [
+      "王牌村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "银海社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "抱湖塘村",
+    "aliases": [
+      "抱湖塘村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "银海社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "大王村",
+    "aliases": [
+      "大王村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "银海社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "十里牌村",
+    "aliases": [
+      "十里牌村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "银海社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "畈田王村",
+    "aliases": [
+      "畈田王村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "诚信社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "草塘沿村",
+    "aliases": [
+      "草塘沿村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "诚信社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "殿山村",
+    "aliases": [
+      "殿山村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "诚信社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "北门村",
+    "aliases": [
+      "北门村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "诚信社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "西张村",
+    "aliases": [
+      "西张村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "诚信社区"
+  },
+  {
+    "fasqdm": "330782740043",
+    "fasqmc": "福田过溪楼村",
+    "aliases": [
+      "福田过溪楼村",
+      "过溪楼村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "330782740036",
+    "fasqmc": "福田西界村",
+    "aliases": [
+      "福田西界村",
+      "西界村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "330782740035",
+    "fasqmc": "福田下沈村",
+    "aliases": [
+      "下沈村",
+      "福田下沈村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "330782740040",
+    "fasqmc": "福田溪前村",
+    "aliases": [
+      "溪前村",
+      "福田溪前村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "330782740038",
+    "fasqmc": "福田森屋村",
+    "aliases": [
+      "森屋村",
+      "福田森屋村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "330782740039",
+    "fasqmc": "福田前店村",
+    "aliases": [
+      "前店村",
+      "福田前店村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "堂阁村（拆）",
+    "aliases": [
+      "堂阁村（拆）"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "前上周村（拆）",
+    "aliases": [
+      "前上周村（拆）"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "祖科塘村（拆）",
+    "aliases": [
+      "祖科塘村（拆）"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "330782740046",
+    "fasqmc": "福田西罗店村",
+    "aliases": [
+      "福田西罗店村",
+      "西罗店村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "330782740044",
+    "fasqmc": "福田下西陶村",
+    "aliases": [
+      "下西陶村",
+      "福田下西陶村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "330782740042",
+    "fasqmc": "福田殿前村",
+    "aliases": [
+      "殿前村",
+      "福田殿前村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "330782740041",
+    "fasqmc": "福田下兆村",
+    "aliases": [
+      "下兆村",
+      "福田下兆村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "荷叶塘共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "毛竹园",
+    "aliases": [
+      "毛竹园"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "宗宅社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "屋基村",
+    "aliases": [
+      "屋基村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "荷塘社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "洪界村",
+    "aliases": [
+      "洪界村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "荷塘社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "荷叶塘村",
+    "aliases": [
+      "荷叶塘村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "物华社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "东大鲁村",
+    "aliases": [
+      "东大鲁村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "物华社区"
+  },
+  {
+    "fasqdm": "330782740018",
+    "fasqmc": "福田尚经村",
+    "aliases": [
+      "尚经村",
+      "福田尚经村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "尚经共建委"
+  },
+  {
+    "fasqdm": "330782740020",
+    "fasqmc": "福田罗店村",
+    "aliases": [
+      "福田罗店村",
+      "罗店村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "尚经共建委"
+  },
+  {
+    "fasqdm": "330782740019",
+    "fasqmc": "福田洛店村",
+    "aliases": [
+      "洛店村",
+      "福田洛店村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "尚经共建委"
+  },
+  {
+    "fasqdm": "330782740025",
+    "fasqmc": "福田官端前村",
+    "aliases": [
+      "官端前村",
+      "福田官端前村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "尚经共建委"
+  },
+  {
+    "fasqdm": "330782740027",
+    "fasqmc": "福田东象山村",
+    "aliases": [
+      "东象山村",
+      "福田东象山村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "尚经共建委"
+  },
+  {
+    "fasqdm": "330782740028",
+    "fasqmc": "福田立碑塘村",
+    "aliases": [
+      "福田立碑塘村",
+      "立碑塘村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "尚经共建委"
+  },
+  {
+    "fasqdm": "330782740021",
+    "fasqmc": "福田全宅村",
+    "aliases": [
+      "全宅村",
+      "福田全宅村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "尚经共建委"
+  },
+  {
+    "fasqdm": "330782740024",
+    "fasqmc": "福田下娄店村",
+    "aliases": [
+      "下娄店村",
+      "福田下娄店村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "尚经共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "东前王村",
+    "aliases": [
+      "东前王村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "商城社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "楼西塘",
+    "aliases": [
+      "楼西塘"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "振兴社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "东傅宅",
+    "aliases": [
+      "东傅宅"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "振兴社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "麻车二区",
+    "aliases": [
+      "麻车二区"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "振兴社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "北下朱",
+    "aliases": [
+      "北下朱"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "振兴社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "紫金一区、紫金二区、紫金三区、紫金五区、茂盛家园（田畈村）、白塘畈村",
+    "aliases": [
+      "紫金一区、紫金二区、紫金三区、紫金五区、茂盛家园（田畈村）、白塘畈村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "下骆宅社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "前黄宅",
+    "aliases": [
+      "前黄宅"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "东岗山",
+    "aliases": [
+      "东岗山"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "330782740017",
+    "fasqmc": "福田杏园村",
+    "aliases": [
+      "杏园村",
+      "福田杏园村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "330782740022",
+    "fasqmc": "福田清塘村",
+    "aliases": [
+      "清塘村",
+      "福田清塘村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782740000",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "白岸头",
+    "aliases": [
+      "白岸头"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "八脚坎",
+    "aliases": [
+      "八脚坎"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "下华店",
+    "aliases": [
+      "下华店"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "洋塘桥头",
+    "aliases": [
+      "洋塘桥头"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "九如堂",
+    "aliases": [
+      "九如堂"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "新塘下",
+    "aliases": [
+      "新塘下"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "gongjianwei",
+    "org_name": "下骆宅共建委"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "齐街村",
+    "aliases": [
+      "齐街村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "兴隆社区"
+  },
+  {
+    "fasqdm": "330782580174",
+    "fasqmc": "佛堂南江村",
+    "aliases": [
+      "佛堂南江村",
+      "南江村",
+      "江村"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "330782580000",
+    "org_type": "jingwuqu",
+    "org_name": "兴隆社区"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "麻车新村一区",
+    "aliases": [
+      "麻车新村一区"
+    ],
+    "station_name": "福田派出所",
+    "gxdwdm": "",
+    "org_type": "jingwuqu",
+    "org_name": "兴隆社区"
+  },
+  {
+    "fasqdm": "330782620127",
+    "fasqmc": "城西何斯路村",
+    "aliases": [
+      "何斯路村",
+      "城西何斯路村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "何里片"
+  },
+  {
+    "fasqdm": "330782620128",
+    "fasqmc": "城西分水塘村",
+    "aliases": [
+      "分水塘村",
+      "城西分水塘村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "何里片"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "城西石明塘村",
+    "aliases": [
+      "城西石明塘村",
+      "石明塘村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "",
+    "org_type": "pianqu",
+    "org_name": "何里片"
+  },
+  {
+    "fasqdm": "330782620131",
+    "fasqmc": "城西龙山村",
+    "aliases": [
+      "城西龙山村",
+      "龙山村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "何里片"
+  },
+  {
+    "fasqdm": "330782620107",
+    "fasqmc": "城西八一村",
+    "aliases": [
+      "八一村",
+      "城西八一村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇东片"
+  },
+  {
+    "fasqdm": "330782620118",
+    "fasqmc": "城西井头徐村",
+    "aliases": [
+      "井头徐村",
+      "城西井头徐村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇东片"
+  },
+  {
+    "fasqdm": "330782620109",
+    "fasqmc": "城西五星村",
+    "aliases": [
+      "五星村",
+      "城西五星村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇东片"
+  },
+  {
+    "fasqdm": "330782620110",
+    "fasqmc": "城西毛店桥头村",
+    "aliases": [
+      "城西毛店桥头村",
+      "毛店桥头村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇东片"
+  },
+  {
+    "fasqdm": "330782620113",
+    "fasqmc": "城西于宅村",
+    "aliases": [
+      "于宅村",
+      "城西于宅村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇东片"
+  },
+  {
+    "fasqdm": "330782620112",
+    "fasqmc": "城西山翁村",
+    "aliases": [
+      "城西山翁村",
+      "山翁村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇东片"
+  },
+  {
+    "fasqdm": "330782620111",
+    "fasqmc": "城西西俞村",
+    "aliases": [
+      "城西西俞村",
+      "西俞村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇东片"
+  },
+  {
+    "fasqdm": "330782620108",
+    "fasqmc": "城西枫溪村",
+    "aliases": [
+      "城西枫溪村",
+      "枫溪村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇东片"
+  },
+  {
+    "fasqdm": "330782620117",
+    "fasqmc": "城西夏迹塘村",
+    "aliases": [
+      "城西夏迹塘村",
+      "夏迹塘村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇东片"
+  },
+  {
+    "fasqdm": "330782620133",
+    "fasqmc": "城西新港村",
+    "aliases": [
+      "城西新港村",
+      "新港村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇西片"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "城西上杨村",
+    "aliases": [
+      "上杨村",
+      "城西上杨村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "",
+    "org_type": "pianqu",
+    "org_name": "镇西片"
+  },
+  {
+    "fasqdm": "330782620126",
+    "fasqmc": "城西流大塘村",
+    "aliases": [
+      "城西流大塘村",
+      "流大塘村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇西片"
+  },
+  {
+    "fasqdm": "330782620120",
+    "fasqmc": "城西夏演村",
+    "aliases": [
+      "城西夏演村",
+      "夏演村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇西片"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "城西夏楼村",
+    "aliases": [
+      "城西夏楼村",
+      "夏楼村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "",
+    "org_type": "pianqu",
+    "org_name": "镇西片"
+  },
+  {
+    "fasqdm": "330782620121",
+    "fasqmc": "城西溪干村",
+    "aliases": [
+      "城西溪干村",
+      "溪干村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇西片"
+  },
+  {
+    "fasqdm": "330782620132",
+    "fasqmc": "城西流里塘村",
+    "aliases": [
+      "城西流里塘村",
+      "流里塘村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇西片"
+  },
+  {
+    "fasqdm": "330782620124",
+    "fasqmc": "城西后叶村",
+    "aliases": [
+      "后叶村",
+      "城西后叶村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "镇西片"
+  },
+  {
+    "fasqdm": "330782620116",
+    "fasqmc": "城西益公山村",
+    "aliases": [
+      "城西益公山村",
+      "益公山村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "园区片"
+  },
+  {
+    "fasqdm": "330782620122",
+    "fasqmc": "城西桥头村",
+    "aliases": [
+      "城西桥头村",
+      "桥头村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "园区片"
+  },
+  {
+    "fasqdm": "330782620114",
+    "fasqmc": "城西殿口村",
+    "aliases": [
+      "城西殿口村",
+      "殿口村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "园区片"
+  },
+  {
+    "fasqdm": "330782620115",
+    "fasqmc": "城西蒋母塘村",
+    "aliases": [
+      "城西蒋母塘村",
+      "蒋母塘村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "园区片"
+  },
+  {
+    "fasqdm": "330782620119",
+    "fasqmc": "城西新双溪村",
+    "aliases": [
+      "城西新双溪村",
+      "新双溪村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "园区片"
+  },
+  {
+    "fasqdm": "330782620130",
+    "fasqmc": "城西何泮山村",
+    "aliases": [
+      "何泮山村",
+      "城西何泮山村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "园区片"
+  },
+  {
+    "fasqdm": "330782620104",
+    "fasqmc": "城西五一村",
+    "aliases": [
+      "五一村",
+      "城西五一村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "园区片"
+  },
+  {
+    "fasqdm": "330782620105",
+    "fasqmc": "城西六一村",
+    "aliases": [
+      "六一村",
+      "城西六一村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "园区片"
+  },
+  {
+    "fasqdm": "330782620106",
+    "fasqmc": "城西七一村",
+    "aliases": [
+      "七一村",
+      "城西七一村"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "pianqu",
+    "org_name": "园区片"
+  },
+  {
+    "fasqdm": "330782620136",
+    "fasqmc": "城西陆港社区",
+    "aliases": [
+      "城西陆港社区",
+      "陆港社区"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "jingwuqu",
+    "org_name": "陆港社区"
+  },
+  {
+    "fasqdm": "330782620135",
+    "fasqmc": "城西汇港社区",
+    "aliases": [
+      "城西汇港社区",
+      "汇港社区"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "jingwuqu",
+    "org_name": "汇港社区"
+  },
+  {
+    "fasqdm": "330782620134",
+    "fasqmc": "城西求真社区",
+    "aliases": [
+      "城西求真社区",
+      "求真社区"
+    ],
+    "station_name": "城西派出所",
+    "gxdwdm": "330782620000",
+    "org_type": "jingwuqu",
+    "org_name": "求真社区"
+  },
+  {
+    "fasqdm": "330782670098",
+    "fasqmc": "义亭车路村",
+    "aliases": [
+      "义亭车路村",
+      "车路村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670120",
+    "fasqmc": "义亭畈田朱村",
+    "aliases": [
+      "义亭畈田朱村",
+      "畈田朱村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670094",
+    "fasqmc": "义亭陇头朱村",
+    "aliases": [
+      "义亭陇头朱村",
+      "陇头朱村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670096",
+    "fasqmc": "义亭青肃村",
+    "aliases": [
+      "义亭青肃村",
+      "青肃村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670099",
+    "fasqmc": "义亭上滕村",
+    "aliases": [
+      "上滕村",
+      "义亭上滕村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670097",
+    "fasqmc": "义亭上宅村",
+    "aliases": [
+      "上宅村",
+      "义亭上宅村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670103",
+    "fasqmc": "义亭西楼村",
+    "aliases": [
+      "义亭西楼村",
+      "西楼村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670095",
+    "fasqmc": "义亭西田村",
+    "aliases": [
+      "义亭西田村",
+      "西田村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670100",
+    "fasqmc": "义亭下店村",
+    "aliases": [
+      "下店村",
+      "义亭下店村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670101",
+    "fasqmc": "义亭下滕村",
+    "aliases": [
+      "下滕村",
+      "义亭下滕村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670102",
+    "fasqmc": "义亭先田村",
+    "aliases": [
+      "义亭先田村",
+      "先田村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670121",
+    "fasqmc": "义亭早溪塘村",
+    "aliases": [
+      "义亭早溪塘村",
+      "早溪塘村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "畈田朱片"
+  },
+  {
+    "fasqdm": "330782670088",
+    "fasqmc": "义亭白塘村",
+    "aliases": [
+      "义亭白塘村",
+      "白塘村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "姑塘片"
+  },
+  {
+    "fasqdm": "330782670122",
+    "fasqmc": "义亭包西塘村",
+    "aliases": [
+      "义亭包西塘村",
+      "包西塘村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "姑塘片"
+  },
+  {
+    "fasqdm": "330782670090",
+    "fasqmc": "义亭鲍宅村",
+    "aliases": [
+      "义亭鲍宅村",
+      "鲍宅村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "姑塘片"
+  },
+  {
+    "fasqdm": "330782670111",
+    "fasqmc": "义亭古亭塘村",
+    "aliases": [
+      "义亭古亭塘村",
+      "古亭塘村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "姑塘片"
+  },
+  {
+    "fasqdm": "330782670112",
+    "fasqmc": "义亭龙华院村",
+    "aliases": [
+      "义亭龙华院村",
+      "龙华院村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "姑塘片"
+  },
+  {
+    "fasqdm": "330782670089",
+    "fasqmc": "义亭山景村",
+    "aliases": [
+      "义亭山景村",
+      "山景村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "姑塘片"
+  },
+  {
+    "fasqdm": "330782670125",
+    "fasqmc": "义亭五联村",
+    "aliases": [
+      "义亭五联村",
+      "五联村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "姑塘片"
+  },
+  {
+    "fasqdm": "330782670104",
+    "fasqmc": "义亭缸窑村",
+    "aliases": [
+      "义亭缸窑村",
+      "缸窑村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "杭畴片"
+  },
+  {
+    "fasqdm": "330782670110",
+    "fasqmc": "义亭杭畴村",
+    "aliases": [
+      "义亭杭畴村",
+      "杭畴村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "杭畴片"
+  },
+  {
+    "fasqdm": "330782670105",
+    "fasqmc": "义亭何店村",
+    "aliases": [
+      "义亭何店村",
+      "何店村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "杭畴片"
+  },
+  {
+    "fasqdm": "330782670109",
+    "fasqmc": "义亭枧畴村",
+    "aliases": [
+      "义亭枧畴村",
+      "枧畴村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "杭畴片"
+  },
+  {
+    "fasqdm": "330782670124",
+    "fasqmc": "义亭江岸村",
+    "aliases": [
+      "义亭江岸村",
+      "江岸村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "杭畴片"
+  },
+  {
+    "fasqdm": "330782670106",
+    "fasqmc": "义亭前屋村",
+    "aliases": [
+      "义亭前屋村",
+      "前屋村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "杭畴片"
+  },
+  {
+    "fasqdm": "330782670107",
+    "fasqmc": "义亭上胡村",
+    "aliases": [
+      "上胡村",
+      "义亭上胡村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "杭畴片"
+  },
+  {
+    "fasqdm": "330782670108",
+    "fasqmc": "义亭叶前村",
+    "aliases": [
+      "义亭叶前村",
+      "叶前村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "杭畴片"
+  },
+  {
+    "fasqdm": "330782670087",
+    "fasqmc": "义亭黄林山社区",
+    "aliases": [
+      "义亭黄林山社区",
+      "黄林山社区"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "黄林山片"
+  },
+  {
+    "fasqdm": "330782670082",
+    "fasqmc": "义亭陈家社区",
+    "aliases": [
+      "义亭陈家社区",
+      "陈家社区"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "铜山片"
+  },
+  {
+    "fasqdm": "330782670084",
+    "fasqmc": "义亭荷店塘社区",
+    "aliases": [
+      "义亭荷店塘社区",
+      "荷店塘社区"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "铜山片"
+  },
+  {
+    "fasqdm": "330782670091",
+    "fasqmc": "义亭后张村",
+    "aliases": [
+      "义亭后张村",
+      "后张村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "铜山片"
+  },
+  {
+    "fasqdm": "330782670115",
+    "fasqmc": "义亭石塔二村",
+    "aliases": [
+      "义亭石塔二村",
+      "石塔二村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "铜山片"
+  },
+  {
+    "fasqdm": "330782670114",
+    "fasqmc": "义亭石塔一村",
+    "aliases": [
+      "义亭石塔一村",
+      "石塔一村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "铜山片"
+  },
+  {
+    "fasqdm": "330782670123",
+    "fasqmc": "义亭铜山湖村",
+    "aliases": [
+      "义亭铜山湖村",
+      "铜山湖村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "铜山片"
+  },
+  {
+    "fasqdm": "330782670085",
+    "fasqmc": "义亭旺吴桥社区",
+    "aliases": [
+      "义亭旺吴桥社区",
+      "旺吴桥社区"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "铜山片"
+  },
+  {
+    "fasqdm": "330782670113",
+    "fasqmc": "义亭雅文楼村",
+    "aliases": [
+      "义亭雅文楼村",
+      "雅文楼村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "铜山片"
+  },
+  {
+    "fasqdm": "330782670083",
+    "fasqmc": "义亭义亭社区",
+    "aliases": [
+      "义亭义亭社区",
+      "义亭社区"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "铜山片"
+  },
+  {
+    "fasqdm": "330782670119",
+    "fasqmc": "义亭白塔塘村",
+    "aliases": [
+      "义亭白塔塘村",
+      "白塔塘村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "王阡片"
+  },
+  {
+    "fasqdm": "330782670086",
+    "fasqmc": "义亭车站社区",
+    "aliases": [
+      "义亭车站社区",
+      "车站社区"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "王阡片"
+  },
+  {
+    "fasqdm": "330782670118",
+    "fasqmc": "义亭铜山前村",
+    "aliases": [
+      "义亭铜山前村",
+      "铜山前村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "王阡片"
+  },
+  {
+    "fasqdm": "",
+    "fasqmc": "义亭王莲塘村",
+    "aliases": [
+      "义亭王莲塘村",
+      "王莲塘村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "",
+    "org_type": "pianqu",
+    "org_name": "王阡片"
+  },
+  {
+    "fasqdm": "330782670116",
+    "fasqmc": "义亭王阡村",
+    "aliases": [
+      "义亭王阡村",
+      "王阡村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "王阡片"
+  },
+  {
+    "fasqdm": "330782670093",
+    "fasqmc": "义亭吴村村",
+    "aliases": [
+      "义亭吴村村",
+      "吴村村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "王阡片"
+  },
+  {
+    "fasqdm": "330782670092",
+    "fasqmc": "义亭张家村",
+    "aliases": [
+      "义亭张家村",
+      "张家村"
+    ],
+    "station_name": "义亭派出所",
+    "gxdwdm": "330782670000",
+    "org_type": "pianqu",
+    "org_name": "王阡片"
+  },
+  {
+    "fasqdm": "330782560098",
+    "fasqmc": "后宅前后傅村",
+    "aliases": [
+      "前后傅村",
+      "后宅前后傅村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560099",
+    "fasqmc": "后宅全备村",
+    "aliases": [
+      "全备村",
+      "后宅全备村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560105",
+    "fasqmc": "后宅黄龙村居委会",
+    "aliases": [
+      "后宅黄龙村居委会",
+      "黄龙村居委会"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560107",
+    "fasqmc": "后宅宅二村居委会",
+    "aliases": [
+      "后宅宅二村居委会",
+      "宅二村居委会"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560070",
+    "fasqmc": "后宅寺前村",
+    "aliases": [
+      "后宅寺前村",
+      "寺前村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560071",
+    "fasqmc": "后宅洪家村",
+    "aliases": [
+      "后宅洪家村",
+      "洪家村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560072",
+    "fasqmc": "后宅后余村",
+    "aliases": [
+      "后余村",
+      "后宅后余村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560073",
+    "fasqmc": "后宅上周村",
+    "aliases": [
+      "上周村",
+      "后宅上周村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560089",
+    "fasqmc": "后宅后毛店村",
+    "aliases": [
+      "后宅后毛店村",
+      "后毛店村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560090",
+    "fasqmc": "后宅马踏石村",
+    "aliases": [
+      "后宅马踏石村",
+      "马踏石村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560091",
+    "fasqmc": "后宅马交塘村",
+    "aliases": [
+      "后宅马交塘村",
+      "马交塘村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560092",
+    "fasqmc": "后宅西关田村",
+    "aliases": [
+      "后宅西关田村",
+      "西关田村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "德胜共建委"
+  },
+  {
+    "fasqdm": "330782560097",
+    "fasqmc": "后宅金鹤村",
+    "aliases": [
+      "后宅金鹤村",
+      "金鹤村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560093",
+    "fasqmc": "后宅深塘下村",
+    "aliases": [
+      "后宅深塘下村",
+      "深塘下村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560096",
+    "fasqmc": "后宅余店村",
+    "aliases": [
+      "余店村",
+      "后宅余店村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560080",
+    "fasqmc": "后宅上金村",
+    "aliases": [
+      "上金村",
+      "后宅上金村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560081",
+    "fasqmc": "后宅苏街村",
+    "aliases": [
+      "后宅苏街村",
+      "苏街村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560082",
+    "fasqmc": "后宅吴宅村",
+    "aliases": [
+      "后宅吴宅村",
+      "吴宅村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560083",
+    "fasqmc": "后宅下旺村",
+    "aliases": [
+      "下旺村",
+      "后宅下旺村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560084",
+    "fasqmc": "后宅俊塘村",
+    "aliases": [
+      "俊塘村",
+      "后宅俊塘村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560086",
+    "fasqmc": "后宅广口村",
+    "aliases": [
+      "后宅广口村",
+      "广口村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560087",
+    "fasqmc": "后宅湖门村",
+    "aliases": [
+      "后宅湖门村",
+      "湖门村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560088",
+    "fasqmc": "后宅新华村",
+    "aliases": [
+      "后宅新华村",
+      "新华村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "湖门共建委"
+  },
+  {
+    "fasqdm": "330782560094",
+    "fasqmc": "后宅方塘村",
+    "aliases": [
+      "后宅方塘村",
+      "方塘村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "塘李共建委"
+  },
+  {
+    "fasqdm": "330782560095",
+    "fasqmc": "后宅稠岩村",
+    "aliases": [
+      "后宅稠岩村",
+      "稠岩村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "塘李共建委"
+  },
+  {
+    "fasqdm": "330782560074",
+    "fasqmc": "后宅李祖村",
+    "aliases": [
+      "后宅李祖村",
+      "李祖村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "塘李共建委"
+  },
+  {
+    "fasqdm": "330782560075",
+    "fasqmc": "后宅岭脚村",
+    "aliases": [
+      "后宅岭脚村",
+      "岭脚村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "塘李共建委"
+  },
+  {
+    "fasqdm": "330782560076",
+    "fasqmc": "后宅下万村",
+    "aliases": [
+      "下万村",
+      "后宅下万村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "塘李共建委"
+  },
+  {
+    "fasqdm": "330782560077",
+    "fasqmc": "后宅陈宅村",
+    "aliases": [
+      "后宅陈宅村",
+      "陈宅村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "塘李共建委"
+  },
+  {
+    "fasqdm": "330782560078",
+    "fasqmc": "后宅大傅宅村",
+    "aliases": [
+      "后宅大傅宅村",
+      "大傅宅村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "塘李共建委"
+  },
+  {
+    "fasqdm": "330782560079",
+    "fasqmc": "后宅岩南村",
+    "aliases": [
+      "后宅岩南村",
+      "岩南村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "塘李共建委"
+  },
+  {
+    "fasqdm": "330782560085",
+    "fasqmc": "后宅坞灶村",
+    "aliases": [
+      "后宅坞灶村",
+      "坞灶村"
+    ],
+    "station_name": "后宅派出所",
+    "gxdwdm": "330782560000",
+    "org_type": "gongjianwei",
+    "org_name": "塘李共建委"
+  }
+]
