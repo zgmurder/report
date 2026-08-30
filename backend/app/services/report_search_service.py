@@ -128,6 +128,8 @@ class ReportSearchService:
         return ReportSearchBatchResult(items=items)
 
     def query(self, request: ReportSearchQuery, current_user: CurrentUser) -> ReportSearchResult:
+        if request.analysis_type == "jurisdiction_yoy_summary":
+            return self._jurisdiction_yoy_summary(request, current_user)
         dimensions = get_dimensions(request.source)
         measures = get_measures(request.source)
         invalid_dimensions = set(request.dimensions) - set(dimensions)
@@ -181,6 +183,90 @@ class ReportSearchService:
             executed_sql=executed_sql,
             truncated=truncated,
         )
+
+    def _jurisdiction_yoy_summary(
+        self, request: ReportSearchQuery, current_user: CurrentUser
+    ) -> ReportSearchResult:
+        if not current_user.unit_code:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前账号未配置部门")
+        if request.source != "fkd_fkd":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="辖区同比综述暂仅支持反馈单")
+        scope_level = "police_station" if current_user.unit_code == "330782000000" else "community"
+        scope_label = "派出所" if scope_level == "police_station" else "社区"
+        started = perf_counter()
+        rows, executed_sql = self.repository.execute_jurisdiction_yoy_summary(
+            request, current_user.unit_code, scope_level
+        )
+        truncated = len(rows) > request.limit
+        rows = rows[: request.limit]
+        for row in rows:
+            current = int(row.get("event_count") or 0)
+            base = int(row.pop("year_base_count", 0) or 0)
+            row["year_base_count"] = base
+            row["year_on_year_change"] = current - base
+            row["year_on_year_rate"] = round((current - base) / base * 100, 2) if base else None
+            rate = row["year_on_year_rate"]
+            row["trend"] = "unknown" if rate is None else "up" if rate > 0 else "down" if rate < 0 else "flat"
+        summary = self._build_jurisdiction_summary(rows, scope_label)
+        return ReportSearchResult(
+            source=SearchDataSource(**DATA_SOURCES[request.source]),
+            department=self._department(current_user),
+            analysis_type="jurisdiction_yoy_summary",
+            scope_level=scope_level,
+            scope_label=scope_label,
+            summary=summary,
+            columns=[
+                SearchResultColumn(key="scope_name", label=scope_label),
+                SearchResultColumn(key="event_count", label="本期警情", type="number"),
+                SearchResultColumn(key="year_base_count", label="去年同期", type="number"),
+                SearchResultColumn(key="year_on_year_rate", label="同比", type="number"),
+            ],
+            rows=rows,
+            row_count=len(rows),
+            elapsed_ms=round((perf_counter() - started) * 1000),
+            executed_sql=executed_sql,
+            truncated=truncated,
+        )
+
+    @staticmethod
+    def _build_jurisdiction_summary(rows: list[dict], scope_label: str) -> str:
+        def name(row: dict) -> str:
+            value = str(row.get("scope_name") or row.get("scope_code") or "未知")
+            return value.removesuffix("派出所").removesuffix("社区")
+
+        def with_rate(row: dict) -> str:
+            return f"{name(row)}（{float(row['year_on_year_rate']):.2f}%）"
+
+        comparable = [row for row in rows if row.get("year_on_year_rate") is not None]
+        unknown = [row for row in rows if row.get("year_on_year_rate") is None]
+        rising = sorted((row for row in comparable if float(row["year_on_year_rate"]) > 0), key=lambda row: float(row["year_on_year_rate"]), reverse=True)
+        flat = [row for row in comparable if float(row["year_on_year_rate"]) == 0]
+        falling = sorted((row for row in comparable if float(row["year_on_year_rate"]) < 0), key=lambda row: float(row["year_on_year_rate"]))
+        parts: list[str] = []
+        if rising and falling:
+            rise_text = "、".join(with_rate(row) for row in rising[:5]) if len(rising) <= 5 else f"共{len(rising)}个{scope_label}"
+            parts.append(f"{rise_text}同比上升")
+            if flat:
+                flat_text = "、".join(name(row) for row in flat[:5])
+                parts.append(f"{flat_text}同比持平")
+            parts.append(f"其余{len(falling)}个{scope_label}同比下降")
+        elif falling and not rising:
+            parts.append(f"{len(falling)}个{scope_label}同比下降")
+            if flat:
+                parts.append(f"{len(flat)}个{scope_label}同比持平")
+        elif rising and not falling:
+            parts.append(f"{len(rising)}个{scope_label}同比上升")
+            if flat:
+                parts.append(f"{len(flat)}个{scope_label}同比持平")
+        elif flat:
+            parts.append(f"{len(flat)}个{scope_label}同比持平")
+        if falling:
+            parts.append(f"降幅居前三的是{'、'.join(with_rate(row) for row in falling[:3])}")
+        elif rising:
+            parts.append(f"增幅居前三的是{'、'.join(with_rate(row) for row in rising[:3])}")
+        if unknown:
+            parts.append(f"另有{len(unknown)}个{scope_label}因去年同期为零未计算同比")
+        return "，".join(parts) + "。" if parts else f"当前条件下暂无可分析的{scope_label}同比数据。"
 
     @staticmethod
     def _calculate_comparison_metrics(rows: list[dict], selected_measures: list[str], include_proportion: bool) -> None:

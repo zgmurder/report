@@ -274,10 +274,15 @@ function insertHtml(fragment: string) {
 function renderQueryBlock(block: ReportQueryBlock) {
   const result = block.result
   const modeLabel = block.mode === 'dynamic' ? '动态数据' : '静态数据'
+  const jurisdictionSummary = result?.analysis_type === 'jurisdiction_yoy_summary'
+    ? `<p style="margin:0 0 10px;line-height:1.8;">${escapeHtml(result.summary || '')}</p><table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(column.key === 'year_on_year_rate' && row[column.key] !== null && row[column.key] !== undefined ? `${Number(row[column.key]).toFixed(2)}%` : String(row[column.key] ?? '—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+    : ''
   const status = block.error
     ? `<div style="color:#d03050;padding:8px 0;">更新失败：${escapeHtml(block.error)}</div>`
-    : result?.rows.length
-      ? `<table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(String(row[column.key] ?? '—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+    : jurisdictionSummary
+      ? jurisdictionSummary
+      : result?.rows.length
+        ? `<table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(String(row[column.key] ?? '—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
       : '<div style="color:#909399;padding:8px 0;">暂无数据</div>'
   return `<div data-report-query-block="${escapeHtml(block.id)}" data-query-mode="${block.mode}" contenteditable="false" style="margin:12px 0;padding:12px;border:1px solid #d9e9fb;border-radius:8px;background:#f8fbff;"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><strong>${escapeHtml(block.title)}</strong><span style="color:#1890ff;font-size:12px;">${modeLabel}</span></div>${status}</div><p></p>`
 }

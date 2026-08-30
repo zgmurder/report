@@ -20,6 +20,7 @@ class ReportTemplate(Base):
     file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     mime_type: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="enabled")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=local_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=local_now, onupdate=local_now)

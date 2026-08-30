@@ -3,7 +3,6 @@ import { apiDelete, apiGet, apiPost, apiPut } from './request'
 export interface ReportTemplateItem {
   id: number
   name: string
-  category: string
   description: string
   content_json?: Record<string, unknown>
   original_filename?: string | null
@@ -38,7 +37,7 @@ export interface DataSourceItem {
   updated_at: string
 }
 
-export type TemplatePayload = Partial<Pick<ReportTemplateItem, 'name' | 'category' | 'description' | 'content_json' | 'status'>>
+export type TemplatePayload = Partial<Pick<ReportTemplateItem, 'name' | 'description' | 'content_json' | 'status'>>
 export type ComponentPayload = Partial<Pick<StatComponentItem, 'name' | 'component_type' | 'data_source' | 'usage' | 'config_json' | 'status'>>
 export type DataSourcePayload = Partial<Pick<DataSourceItem, 'name' | 'source_type' | 'address' | 'description' | 'config_json' | 'status'>>
 
@@ -50,11 +49,10 @@ export function createTemplate(data: TemplatePayload) {
   return apiPost<ReportTemplateItem>('/catalog/templates', data)
 }
 
-export function uploadTemplate(file: File, data: { name?: string; category: string; description?: string; status?: string }) {
+export function uploadTemplate(file: File, data: { name?: string; description?: string; status?: string }) {
   const form = new FormData()
   form.append('file', file)
   if (data.name) form.append('name', data.name)
-  form.append('category', data.category)
   form.append('description', data.description || '')
   form.append('status', data.status || 'enabled')
   return apiPost<ReportTemplateItem>('/catalog/templates/upload', form)

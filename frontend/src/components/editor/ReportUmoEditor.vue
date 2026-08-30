@@ -70,6 +70,8 @@ const templateMenuPosition = ref({ left: 0, top: 0 })
 let templateTriggerPosition: number | null = null
 const currentEditorConfig = ref<ReportEditorConfig>(normalizeEditorConfig(props.editorConfig))
 const AUTO_SAVE_DEBOUNCE_MS = 2000
+const AUTO_SAVE_STORAGE_KEY = 'report-editor-auto-save-enabled'
+const autoSaveEnabled = ref(localStorage.getItem(AUTO_SAVE_STORAGE_KEY) !== 'false')
 let autoSaveTimer: number | null = null
 let autoSaveSequence = 0
 let reconcilingQueryBlocks = false
@@ -662,7 +664,7 @@ function clearAutoSaveTimer() {
 }
 
 function scheduleAutoSave() {
-  if (props.readOnly || !props.saveHandler || restoringInitialContent.value) return
+  if (!autoSaveEnabled.value || props.readOnly || !props.saveHandler || restoringInitialContent.value) return
   clearAutoSaveTimer()
   const sequence = ++autoSaveSequence
   autoSaveTimer = window.setTimeout(async () => {
@@ -683,6 +685,17 @@ function scheduleAutoSave() {
       console.error('报告自动保存失败', error)
     }
   }, AUTO_SAVE_DEBOUNCE_MS)
+}
+
+function toggleAutoSave() {
+  autoSaveEnabled.value = !autoSaveEnabled.value
+  localStorage.setItem(AUTO_SAVE_STORAGE_KEY, String(autoSaveEnabled.value))
+  if (!autoSaveEnabled.value) {
+    clearAutoSaveTimer()
+    autoSaveSequence += 1
+    return
+  }
+  scheduleAutoSave()
 }
 
 function handlePageOrientationChanged(payload: unknown) {
@@ -749,6 +762,8 @@ defineExpose({
 const editorOptions = computed(() => ({
   locale: 'zh-CN',
   extensions: [reportQueryBlockExtension, templateMentionExtension],
+  // 项目使用 @ 触发 Word 模板菜单，不使用 Umo Editor 自带的“提及用户”菜单。
+  disableExtensions: ['mention'],
   height: '100%',
   document: {
     title: props.title,
@@ -779,21 +794,16 @@ const editorOptions = computed(() => ({
     showToc: false,
     showBreakMarks: false,
   },
-  onChanged: (payload: unknown) => {
+  onChanged: () => {
     if (restoringInitialContent.value) return
-    const data = payload as UmoEditorPayload
-    const html = data.html ?? data.editor?.getHTML?.() ?? data.getHTML?.()
-    const documentJson = data.json && typeof data.json === 'object'
-      ? data.json as Record<string, unknown>
-      : umoRef.value?.getJSON?.() || null
-    if (typeof html === 'string') emit('update:modelValue', html)
-    emit('update:documentJson', documentJson)
-    if (reconcileQueryBlockNodes()) return
-    emitQueryBlockIds(documentJson)
-    nextTick(() => {
-      updateEditorConfig()
-      scheduleAutoSave()
-    })
+    // 长文档的 HTML/JSON 可达数十万字符。若每次按键都把完整内容写入父组件的
+    // Vue 响应式状态，会触发大对象代理和依赖更新，明显阻塞输入。正文仅在保存时同步；
+    // 普通编辑这里只维护防抖保存。只有文档含数据块时才执行结构扫描。
+    if (queryBlockRegistry.size > 0 || Object.keys(props.queryBlocks).length > 0) {
+      if (reconcileQueryBlockNodes()) return
+      emitQueryBlockIds(umoRef.value?.getJSON?.() || null)
+    }
+    scheduleAutoSave()
   },
   onSave: async (payload: unknown, pagePayload: unknown, documentPayload: unknown) => {
     clearAutoSaveTimer()
@@ -854,6 +864,17 @@ const editorOptions = computed(() => ({
       </template>
     </UmoEditor>
 
+    <label
+      v-if="!readOnly"
+      class="auto-save-switch"
+      :class="{ enabled: autoSaveEnabled }"
+      :title="autoSaveEnabled ? '自动保存已开启；关闭后请使用 Ctrl + S 手动保存' : '自动保存已关闭；请使用 Ctrl + S 手动保存'"
+    >
+      <span>自动保存</span>
+      <input type="checkbox" :checked="autoSaveEnabled" @change="toggleAutoSave">
+      <i aria-hidden="true"></i>
+    </label>
+
     <div
       v-if="templateMenuVisible"
       class="template-mention-menu"
@@ -889,10 +910,54 @@ const editorOptions = computed(() => ({
 
 <style scoped>
 .umo-shell {
+  position: relative;
   height: 100%;
   min-height: 0;
   background: #f5f6f8;
 }
+
+.auto-save-switch {
+  position: absolute;
+  z-index: 30;
+  top: 6px;
+  right: 202px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #fff;
+  color: #8c8c8c;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-save-switch.enabled { color: #1890ff; }
+.auto-save-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.auto-save-switch i {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: #bfbfbf;
+  transition: background .2s;
+}
+.auto-save-switch i::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+  transition: transform .2s;
+  content: '';
+}
+.auto-save-switch.enabled i { background: #1890ff; }
+.auto-save-switch.enabled i::after { transform: translateX(12px); }
 
 .template-mention-menu {
   position: fixed;

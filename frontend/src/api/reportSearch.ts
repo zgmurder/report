@@ -59,8 +59,11 @@ export interface SearchMetrics {
   measures: SearchMetric[]
 }
 
+export type SearchAnalysisType = 'standard' | 'jurisdiction_yoy_summary'
+
 export interface SearchQuery {
   source: 'jjd_jjd' | 'fkd_fkd'
+  analysis_type?: SearchAnalysisType
   start_time: string
   end_time: string
   category_codes: string[]
@@ -94,6 +97,10 @@ export interface SearchResult {
   department: SearchDepartment
   columns: SearchResultColumn[]
   rows: Record<string, unknown>[]
+  analysis_type?: SearchAnalysisType
+  scope_level?: 'police_station' | 'community' | null
+  scope_label?: string | null
+  summary?: string | null
   row_count: number
   elapsed_ms: number
   executed_sql: string

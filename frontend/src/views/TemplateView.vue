@@ -27,7 +27,6 @@ const dialog = useDialog()
 const loading = ref(false)
 const submitting = ref(false)
 const keyword = ref('')
-const categoryFilter = ref<string | null>(null)
 const modalVisible = ref(false)
 const modalMode = ref<'create' | 'edit' | 'upload'>('upload')
 const editingId = ref<number | null>(null)
@@ -35,31 +34,20 @@ const selectedFile = ref<File | null>(null)
 const fileList = ref<UploadFileInfo[]>([])
 const formRef = ref<FormInst | null>(null)
 
-const categories = [
-  { label: '警情日报', value: 'daily' },
-  { label: '警情周报', value: 'weekly' },
-  { label: '警情月报', value: 'monthly' },
-  { label: '专题报告', value: 'special' },
-  { label: '其他', value: 'other' },
-]
 const statusOptions = [
   { label: '启用', value: 'enabled' },
   { label: '停用', value: 'disabled' },
 ]
-const form = reactive({ name: '', category: 'daily', description: '', status: 'enabled' })
+const form = reactive({ name: '', description: '', status: 'enabled' })
 const rules = {
   name: { required: true, message: '请输入模板名称', trigger: ['input', 'blur'] },
-  category: { required: true, message: '请选择模板分类', trigger: 'change' },
 }
 
-const categoryMap = Object.fromEntries(categories.map((item) => [item.value, item.label]))
 const filteredTemplates = computed(() => {
   const text = keyword.value.trim().toLowerCase()
-  return store.templates.filter((item) => {
-    const categoryMatched = !categoryFilter.value || item.category === categoryFilter.value
-    const keywordMatched = !text || item.name.toLowerCase().includes(text) || item.description.toLowerCase().includes(text)
-    return categoryMatched && keywordMatched
-  })
+  return store.templates.filter((item) => (
+    !text || item.name.toLowerCase().includes(text) || item.description.toLowerCase().includes(text)
+  ))
 })
 
 function goBack() {
@@ -88,11 +76,13 @@ const columns: DataTableColumns<ReportTemplateItem> = [
     key: 'name',
     minWidth: 220,
     render: (row) => h('div', { class: 'name-cell' }, [
-      h('div', { class: 'word-icon' }, [h(FileText, { size: 20 })]),
-      h('div', [h('strong', row.name), h('small', row.original_filename || '未上传 Word 文件')]),
+      h('div', { class: 'name-main' }, [
+        h('div', { class: 'word-icon' }, [h(FileText, { size: 20 })]),
+        h('strong', row.name),
+      ]),
+      h('small', row.original_filename || '未上传 Word 文件'),
     ]),
   },
-  { title: '分类', key: 'category', width: 120, render: (row) => categoryMap[row.category] || row.category },
   { title: '说明', key: 'description', minWidth: 220, ellipsis: { tooltip: true }, render: (row) => row.description || '-' },
   { title: '大小', key: 'file_size', width: 100, render: (row) => formatSize(row.file_size) },
   {
@@ -132,7 +122,7 @@ function resetForm() {
   editingId.value = null
   selectedFile.value = null
   fileList.value = []
-  Object.assign(form, { name: '', category: 'daily', description: '', status: 'enabled' })
+  Object.assign(form, { name: '', description: '', status: 'enabled' })
 }
 
 function openUpload() {
@@ -151,7 +141,7 @@ function openEdit(row: ReportTemplateItem) {
   resetForm()
   modalMode.value = 'edit'
   editingId.value = row.id
-  Object.assign(form, { name: row.name, category: row.category, description: row.description, status: row.status })
+  Object.assign(form, { name: row.name, description: row.description, status: row.status })
   modalVisible.value = true
 }
 
@@ -226,7 +216,7 @@ onMounted(load)
         </n-button>
         <div>
           <h2>模板库</h2>
-          <p class="muted">上传和维护 Word 报告模板，支持查询、新建、编辑、下载和删除</p>
+          <p class="muted">上传和维护自己的 Word 报告模板；编辑器中只能选择当前账号的模板</p>
         </div>
       </div>
       <n-space>
@@ -237,7 +227,6 @@ onMounted(load)
 
     <div class="filters">
       <n-input v-model:value="keyword" clearable placeholder="搜索模板名称或说明" />
-      <n-select v-model:value="categoryFilter" clearable placeholder="全部分类" :options="categories" />
     </div>
 
     <n-data-table
@@ -245,7 +234,7 @@ onMounted(load)
       :data="filteredTemplates"
       :loading="loading"
       :row-key="(row: ReportTemplateItem) => row.id"
-      :scroll-x="1180"
+      :scroll-x="1040"
       :pagination="{ pageSize: 10 }"
       striped
     />
@@ -267,7 +256,6 @@ onMounted(load)
             <span class="upload-hint">支持 .doc、.docx，单个文件不超过 20MB</span>
           </n-form-item>
           <n-form-item label="模板名称" path="name"><n-input v-model:value="form.name" maxlength="200" show-count /></n-form-item>
-          <n-form-item label="模板分类" path="category"><n-select v-model:value="form.category" :options="categories" /></n-form-item>
           <n-form-item label="模板说明"><n-input v-model:value="form.description" type="textarea" maxlength="500" show-count :autosize="{ minRows: 3, maxRows: 6 }" /></n-form-item>
           <n-form-item label="状态"><n-select v-model:value="form.status" :options="statusOptions" /></n-form-item>
         </n-form>
@@ -286,11 +274,12 @@ onMounted(load)
 .title-area { display: flex; align-items: flex-start; gap: 8px; }
 h2 { margin: 0 0 4px; font-size: 20px; }
 p { margin: 0; }
-.filters { display: grid; grid-template-columns: minmax(240px, 360px) 180px; gap: 12px; margin-bottom: 16px; }
-.name-cell { display: flex; align-items: center; gap: 10px; }
-.name-cell strong, .name-cell small { display: block; }
-.name-cell small { margin-top: 2px; color: #8c8c8c; font-weight: 400; }
-.word-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: none; color: #1890ff; background: #e6f7ff; border-radius: 6px; }
+.filters { width: min(360px, 100%); margin-bottom: 16px; }
+.name-cell { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.name-main { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.name-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name-cell small { display: block; overflow: hidden; color: #8c8c8c; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.word-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: none; color: #1890ff; background: #e6f7ff; border-radius: 5px; }
 .modal-card { width: min(560px, calc(100vw - 32px)); padding: 22px; background: #fff; border-radius: 8px; }
 .modal-card h3 { margin: 0 0 18px; font-size: 18px; }
 .upload-hint { display: block; margin-top: 8px; color: #8c8c8c; font-size: 12px; }

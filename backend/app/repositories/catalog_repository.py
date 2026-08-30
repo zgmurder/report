@@ -79,12 +79,20 @@ class CatalogRepository:
                 row.name, row.source_type, row.address, row.description, row.config_json = seed
                 row.status = "enabled"
 
-    def list_templates(self) -> list[ReportTemplate]:
-        self.ensure_seed_data()
-        return self.db.scalars(select(ReportTemplate).order_by(ReportTemplate.updated_at.desc(), ReportTemplate.id.desc())).all()
+    def list_templates(self, user_id: int) -> list[ReportTemplate]:
+        return self.db.scalars(
+            select(ReportTemplate)
+            .where(ReportTemplate.created_by == user_id)
+            .order_by(ReportTemplate.updated_at.desc(), ReportTemplate.id.desc())
+        ).all()
 
-    def get_template(self, template_id: int) -> ReportTemplate | None:
-        return self.db.get(ReportTemplate, template_id)
+    def get_template(self, template_id: int, user_id: int) -> ReportTemplate | None:
+        return self.db.scalar(
+            select(ReportTemplate).where(
+                ReportTemplate.id == template_id,
+                ReportTemplate.created_by == user_id,
+            )
+        )
 
     def create_template(self, data: dict) -> ReportTemplate:
         row = ReportTemplate(**data)
@@ -93,11 +101,19 @@ class CatalogRepository:
         self.db.refresh(row)
         return row
 
-    def update_template(self, template_id: int, data: dict) -> ReportTemplate | None:
-        return self._update(ReportTemplate, template_id, data)
+    def update_template(self, template_id: int, user_id: int, data: dict) -> ReportTemplate | None:
+        row = self.get_template(template_id, user_id)
+        if not row:
+            return None
+        for key, value in data.items():
+            if value is not None:
+                setattr(row, key, value)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
 
-    def delete_template(self, template_id: int) -> ReportTemplate | None:
-        row = self.db.get(ReportTemplate, template_id)
+    def delete_template(self, template_id: int, user_id: int) -> ReportTemplate | None:
+        row = self.get_template(template_id, user_id)
         if not row:
             return None
         self.db.delete(row)

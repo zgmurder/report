@@ -68,6 +68,7 @@ class SearchMetricResponse(BaseModel):
 
 class ReportSearchQuery(BaseModel):
     source: Literal["jjd_jjd", "fkd_fkd"] = "jjd_jjd"
+    analysis_type: Literal["standard", "jurisdiction_yoy_summary"] = "standard"
     start_time: datetime
     end_time: datetime
     category_codes: list[str] = Field(default_factory=list, max_length=500)
@@ -106,6 +107,10 @@ class ReportSearchResult(BaseModel):
     department: SearchDepartment
     columns: list[SearchResultColumn]
     rows: list[dict[str, Any]]
+    analysis_type: Literal["standard", "jurisdiction_yoy_summary"] = "standard"
+    scope_level: Literal["police_station", "community"] | None = None
+    scope_label: str | None = None
+    summary: str | None = None
     row_count: int
     elapsed_ms: int
     executed_sql: str

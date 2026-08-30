@@ -35,6 +35,7 @@ def init_db() -> None:
                 "file_path": "VARCHAR(500) NULL",
                 "file_size": "INT NULL",
                 "mime_type": "VARCHAR(150) NULL",
+                "created_by": "INT NULL",
             }
             for column_name, definition in template_columns.items():
                 has_column = conn.execute(
@@ -46,6 +47,15 @@ def init_db() -> None:
                 ).scalar()
                 if not has_column:
                     conn.execute(text(f"ALTER TABLE report_templates ADD COLUMN {column_name} {definition}"))
+            # 历史模板没有所有者；首次升级时归属到最早创建的管理员账号，避免直接消失。
+            default_template_owner = conn.execute(
+                text("SELECT id FROM sys_users WHERE status = 'enabled' ORDER BY id ASC LIMIT 1")
+            ).scalar()
+            if default_template_owner:
+                conn.execute(
+                    text("UPDATE report_templates SET created_by = :user_id WHERE created_by IS NULL"),
+                    {"user_id": default_template_owner},
+                )
             has_folder_id = conn.execute(
                 text(
                     "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
@@ -62,6 +72,14 @@ def init_db() -> None:
             ).scalar()
             if not has_editor_config:
                 conn.execute(text("ALTER TABLE report_documents ADD COLUMN editor_config JSON NULL AFTER source_query"))
+            html_snapshot_type = conn.execute(
+                text(
+                    "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'report_documents' AND COLUMN_NAME = 'html_snapshot'"
+                )
+            ).scalar()
+            if html_snapshot_type and html_snapshot_type.lower() != "longtext":
+                conn.execute(text("ALTER TABLE report_documents MODIFY COLUMN html_snapshot LONGTEXT NULL"))
 
     from app.repositories.user_repository import UserRepository
 

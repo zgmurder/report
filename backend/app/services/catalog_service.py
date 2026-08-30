@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
+from app.core.security import CurrentUser
 from app.repositories.catalog_repository import CatalogRepository
 from app.services.template_file_service import TemplateFileService
 from app.schemas.catalog import (
@@ -19,16 +20,22 @@ from app.schemas.catalog import (
 
 
 class CatalogService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, current_user: CurrentUser):
         self.repository = CatalogRepository(db)
         self.template_files = TemplateFileService()
+        self.current_user = current_user
 
     def list_templates(self) -> list[ReportTemplateDetail]:
-        return [ReportTemplateDetail.model_validate(row, from_attributes=True) for row in self.repository.list_templates()]
+        return [
+            ReportTemplateDetail.model_validate(row, from_attributes=True)
+            for row in self.repository.list_templates(self.current_user.id)
+        ]
 
     def create_template(self, req: ReportTemplateCreateRequest) -> ReportTemplateDetail:
         data = req.model_dump(mode="json")
         data["name"] = self._require_text(req.name, "模板名称不能为空")
+        data["category"] = "default"
+        data["created_by"] = self.current_user.id
         row = self.repository.create_template(data)
         return ReportTemplateDetail.model_validate(row, from_attributes=True)
 
@@ -36,7 +43,6 @@ class CatalogService:
         self,
         file: UploadFile,
         name: str | None = None,
-        category: str = "daily",
         description: str = "",
         status_value: str = "enabled",
     ) -> ReportTemplateDetail:
@@ -45,10 +51,11 @@ class CatalogService:
         try:
             row = self.repository.create_template({
                 "name": template_name,
-                "category": self._require_text(category, "模板分类不能为空"),
+                "category": "default",
                 "description": description.strip(),
                 "content_json": {},
                 "status": self._require_text(status_value, "模板状态不能为空"),
+                "created_by": self.current_user.id,
                 **file_data,
             })
         except Exception:
@@ -60,13 +67,13 @@ class CatalogService:
         data = req.model_dump(exclude_unset=True, mode="json")
         if req.name is not None:
             data["name"] = self._require_text(req.name, "模板名称不能为空")
-        row = self.repository.update_template(template_id, data)
+        row = self.repository.update_template(template_id, self.current_user.id, data)
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
         return ReportTemplateDetail.model_validate(row, from_attributes=True)
 
     def download_template(self, template_id: int) -> tuple[str, str, bytes]:
-        row = self.repository.get_template(template_id)
+        row = self.repository.get_template(template_id, self.current_user.id)
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
         content = self.template_files.read(row.file_path)
@@ -74,7 +81,7 @@ class CatalogService:
         return filename, row.mime_type or "application/octet-stream", content
 
     def get_template_content(self, template_id: int) -> dict[str, str | int]:
-        row = self.repository.get_template(template_id)
+        row = self.repository.get_template(template_id, self.current_user.id)
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
         return {
@@ -85,7 +92,7 @@ class CatalogService:
         }
 
     def delete_template(self, template_id: int) -> dict[str, bool]:
-        row = self.repository.delete_template(template_id)
+        row = self.repository.delete_template(template_id, self.current_user.id)
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
         self.template_files.delete(row.file_path)

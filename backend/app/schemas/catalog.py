@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 
 class ReportTemplateCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
-    category: str = Field(default="daily", min_length=1, max_length=50)
     description: str = Field(default="", max_length=500)
     content_json: dict[str, Any] = Field(default_factory=dict)
     status: str = Field(default="enabled", min_length=1, max_length=20)
@@ -14,7 +13,6 @@ class ReportTemplateCreateRequest(BaseModel):
 
 class ReportTemplateUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    category: str | None = Field(default=None, min_length=1, max_length=50)
     description: str | None = Field(default=None, max_length=500)
     content_json: dict[str, Any] | None = None
     status: str | None = Field(default=None, min_length=1, max_length=20)
@@ -23,7 +21,6 @@ class ReportTemplateUpdateRequest(BaseModel):
 class ReportTemplateItem(BaseModel):
     id: int
     name: str
-    category: str
     description: str = ""
     status: str
     created_at: datetime

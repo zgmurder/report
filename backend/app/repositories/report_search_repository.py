@@ -147,6 +147,62 @@ class ReportSearchRepository:
         ).scalar()
         return str(name or unit_code)
 
+    def execute_jurisdiction_yoy_summary(
+        self, query: ReportSearchQuery, unit_code: str, scope_level: str
+    ) -> tuple[list[dict], str]:
+        periods = self._comparison_periods(query.start_time, query.end_time, ["year_on_year_rate"])
+        params: dict = {
+            "current_start": periods["current_start"],
+            "current_end": periods["current_end"],
+            "year_start": periods["year_start"],
+            "year_end": periods["year_end"],
+            "scan_start": periods["scan_start"],
+            "limit": query.limit + 1,
+        }
+        conditions = [
+            "j.`fksj` >= :scan_start",
+            "j.`fksj` < :current_end",
+        ]
+        self._append_classification_conditions(conditions, params, query, SOURCE_CONFIG["fkd_fkd"])
+
+        if scope_level == "police_station":
+            group_expression = "CAST(j.`sdpcs` AS CHAR)"
+            name_expression = "COALESCE(NULLIF(d.short_dept_name, ''), NULLIF(d.detail_dept_name, ''), CAST(j.`sdpcs` AS CHAR))"
+            joins = "LEFT JOIN jz_dept AS d ON CONVERT(d.dept_code USING utf8mb4) COLLATE utf8mb4_unicode_ci = CAST(j.`sdpcs` AS CHAR) COLLATE utf8mb4_unicode_ci"
+            conditions.extend([
+                "j.`sdpcs` LIKE '330782%'",
+                "COALESCE(NULLIF(d.short_dept_name, ''), NULLIF(d.detail_dept_name, '')) LIKE '%派出所%'",
+            ])
+        else:
+            group_expression = "CAST(j.`sdsq` AS CHAR)"
+            name_expression = "COALESCE(NULLIF(c.fasqmc, ''), CAST(j.`sdsq` AS CHAR))"
+            joins = "LEFT JOIN zd_fasqdm AS c ON CAST(c.fasqdm AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(j.`sdsq` AS CHAR) COLLATE utf8mb4_unicode_ci"
+            conditions.extend([
+                "CAST(j.`sdpcs` AS CHAR) = :scope_unit_code",
+                "j.`sdsq` IS NOT NULL",
+                "TRIM(CAST(j.`sdsq` AS CHAR)) <> ''",
+            ])
+            params["scope_unit_code"] = unit_code
+
+        selections = [
+            f"{group_expression} AS scope_code",
+            f"{name_expression} AS scope_name",
+            f"{self._period_count_expression(SOURCE_CONFIG['fkd_fkd'], ':current_start', ':current_end')} AS event_count",
+            f"{self._period_count_expression(SOURCE_CONFIG['fkd_fkd'], ':year_start', ':year_end')} AS year_base_count",
+        ]
+        sql = "\n".join([
+            f"SELECT {', '.join(selections)}",
+            "FROM `fkd_fkd` AS j",
+            joins,
+            f"WHERE {' AND '.join(conditions)}",
+            f"GROUP BY {group_expression}, {name_expression}",
+            "ORDER BY event_count DESC",
+            "LIMIT :limit",
+        ])
+        statement = text(sql)
+        executed_sql = self._render_sql(statement, params)
+        return [dict(row) for row in self.db.execute(statement, params).mappings().all()], executed_sql
+
     def execute(self, query: ReportSearchQuery, unit_code: str | None) -> tuple[list[dict], str]:
         if not query.dimensions:
             if any((query.category_codes, query.type_codes, query.detail_codes)):
@@ -277,6 +333,26 @@ class ReportSearchRepository:
         statement = text(sql)
         executed_sql = self._render_sql(statement, params)
         return [dict(row) for row in self.db.execute(statement, params).mappings().all()], executed_sql
+
+    @staticmethod
+    def _append_classification_conditions(
+        conditions: list[str], params: dict, query: ReportSearchQuery, source: dict, alias: str = "j"
+    ) -> None:
+        selected = (
+            ("category", source["category_column"], query.category_codes),
+            ("type", source["type_column"], query.type_codes),
+            ("detail", source["detail_column"], query.detail_codes),
+        )
+        for level, column, raw_codes in selected:
+            codes = list(dict.fromkeys(raw_codes))
+            if not codes:
+                continue
+            placeholders = []
+            for index, code in enumerate(codes):
+                name = f"summary_{level}_{index}"
+                params[name] = code
+                placeholders.append(f":{name}")
+            conditions.append(f"CAST({alias}.`{column}` AS CHAR) IN ({', '.join(placeholders)})")
 
     @staticmethod
     def _count_expression(source: dict, alias: str = "j") -> str:

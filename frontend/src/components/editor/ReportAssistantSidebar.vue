@@ -57,6 +57,7 @@ const categoryCodes = ref<string[]>([])
 const typeCodes = ref<string[]>([])
 const detailCodes = ref<string[]>([])
 const selectedMeasures = ref<string[]>(['event_count'])
+const analysisType = ref<'standard' | 'jurisdiction_yoy_summary'>('standard')
 const insertionMode = ref<ReportQueryBlockMode>('snapshot')
 const categories = ref<SearchClassificationItem[]>([])
 const types = ref<SearchClassificationItem[]>([])
@@ -92,6 +93,7 @@ const currentDepartmentName = computed(() => {
   return findName(departmentStore.departmentTree) || options.value?.current_department.name || (code === '330782000000' ? '义乌市局' : code)
 })
 
+const jurisdictionScopeLabel = computed(() => currentUnitCode.value === '330782000000' ? '派出所' : '管辖社区')
 const sourceOptions = computed(() =>
   (options.value?.data_sources || [{ key: 'jjd_jjd', name: '接警单', enabled: true }]).map((item) => ({ label: item.name, value: item.key, disabled: !item.enabled })),
 )
@@ -321,14 +323,17 @@ async function runQuery() {
   querying.value = true
   try {
     result.value = await executeReportSearch({
-      source: source.value,
+      source: analysisType.value === 'jurisdiction_yoy_summary' ? 'fkd_fkd' : source.value,
+      analysis_type: analysisType.value,
       start_time: toLocalDateTime(range.value[0]),
       end_time: toLocalDateTime(range.value[1]),
       category_codes: categoryCodes.value,
       type_codes: typeCodes.value,
       detail_codes: detailCodes.value,
       dimensions: [],
-      measures: selectedMeasures.value,
+      measures: analysisType.value === 'jurisdiction_yoy_summary'
+        ? ['event_count', 'year_on_year_rate', 'year_on_year_change']
+        : selectedMeasures.value,
       limit: 100,
     })
   } catch (error) {
@@ -344,12 +349,15 @@ function escapeHtml(value: unknown) {
 
 function currentBlockQuery(): ReportQueryBlock['query'] {
   return {
-    source: source.value,
+    source: analysisType.value === 'jurisdiction_yoy_summary' ? 'fkd_fkd' : source.value,
+    analysis_type: analysisType.value,
     category_codes: [...categoryCodes.value],
     type_codes: [...typeCodes.value],
     detail_codes: [...detailCodes.value],
     dimensions: [],
-    measures: [...selectedMeasures.value],
+    measures: analysisType.value === 'jurisdiction_yoy_summary'
+      ? ['event_count', 'year_on_year_rate', 'year_on_year_change']
+      : [...selectedMeasures.value],
     limit: 100,
   }
 }
@@ -360,7 +368,9 @@ function createQueryBlock(): ReportQueryBlock | null {
     id: crypto.randomUUID(),
     mode: insertionMode.value,
     query: currentBlockQuery(),
-    title: `${result.value.source.name}统计结果`,
+    title: result.value.analysis_type === 'jurisdiction_yoy_summary'
+      ? `${result.value.scope_label || '辖区'}同比综述`
+      : `${result.value.source.name}统计结果`,
     result: result.value,
     last_updated_at: new Date().toISOString(),
   }
@@ -384,6 +394,7 @@ function handleResultDragStart(event: DragEvent) {
 function resetSearch() {
   localStorage.removeItem(globalParametersCacheKey())
   source.value = 'jjd_jjd'
+  analysisType.value = 'standard'
   categoryCodes.value = []
   selectedMeasures.value = ['event_count']
   typeCodes.value = []
@@ -427,6 +438,10 @@ watch([categoryCodes, typeCodes, detailCodes], () => {
   result.value = null
 })
 watch(selectedMeasures, () => { result.value = null })
+watch(analysisType, (value) => {
+  result.value = null
+  if (value === 'jurisdiction_yoy_summary') source.value = 'fkd_fkd'
+})
 onMounted(async () => {
   if (!userStore.user && userStore.token) {
     await userStore.loadCurrentUser().catch(() => undefined)
@@ -492,6 +507,17 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
             </section>
 
             <section class="section-card">
+              <div class="field">
+                <div class="field-label">统计方式</div>
+                <n-radio-group v-model:value="analysisType" size="small">
+                  <n-radio-button value="standard">普通统计</n-radio-button>
+                  <n-radio-button value="jurisdiction_yoy_summary">辖区同比综述</n-radio-button>
+                </n-radio-group>
+                <div v-if="analysisType === 'jurisdiction_yoy_summary'" class="field-hint">
+                  根据当前账号自动按{{ jurisdictionScopeLabel }}统计，并生成同比综述
+                </div>
+              </div>
+              <div class="section-divider"></div>
               <div class="section-title"><span>分类筛选</span><n-tag size="small" :bordered="false">各层级独立</n-tag></div>
               <n-spin :show="loadingClassifications" size="small">
                 <div class="classification-grid">
@@ -510,7 +536,7 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
                 </div>
               </n-spin>
               <div class="section-divider"></div>
-              <div class="field">
+              <div v-if="analysisType === 'standard'" class="field">
                 <div class="field-label">统计指标</div>
                 <n-checkbox-group v-model:value="selectedMeasures">
                   <div class="metric-options">
@@ -524,6 +550,9 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
                   </div>
                 </n-checkbox-group>
               </div>
+              <n-alert v-else type="info" :show-icon="false" class="summary-mode-alert">
+                数据源固定为反馈单，自动计算本期、去年同期及同比，统计层级为{{ jurisdictionScopeLabel }}。
+              </n-alert>
               <n-button type="primary" block :loading="querying" @click="runQuery">
                 <template #icon><n-icon :component="Search" /></template>
                 执行查询
@@ -543,7 +572,22 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
                 title="可将查询结果拖入编辑器"
                 @dragstart="handleResultDragStart"
               >
-                <div v-if="totalMetrics.length" class="total-statistic-wrap">
+                <div v-if="result?.analysis_type === 'jurisdiction_yoy_summary'" class="jurisdiction-summary-result">
+                  <p>{{ result.summary }}</p>
+                  <div class="jurisdiction-summary-list">
+                    <div v-for="row in result.rows" :key="String(row.scope_code)" class="jurisdiction-summary-row">
+                      <span :title="String(row.scope_name)">{{ row.scope_name }}</span>
+                      <strong :class="metricClass('year_on_year_rate', row.year_on_year_rate)">
+                        {{ formatMetric('year_on_year_rate', row.year_on_year_rate) }}
+                      </strong>
+                    </div>
+                  </div>
+                  <n-button size="tiny" secondary class="sql-button" @click="showSql = true">
+                    <template #icon><n-icon :component="Code2" /></template>
+                    SQL
+                  </n-button>
+                </div>
+                <div v-else-if="totalMetrics.length" class="total-statistic-wrap">
                   <div class="total-metrics">
                     <n-statistic
                       v-for="metric in totalMetrics"
@@ -648,9 +692,17 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
 .metric-options :deep(.n-checkbox__label) { padding-left: 5px; font-size: 12px; }
 .result-meta { color: #909399; font-size: 11px; font-weight: 400; }
 .result-alert { margin-bottom: 8px; font-size: 11px; }
+.summary-mode-alert { margin-bottom: 12px; font-size: 11px; }
 .result-output { min-width: 0; cursor: grab; }
 .result-output:active { cursor: grabbing; }
 .insert-controls { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.jurisdiction-summary-result { position: relative; padding: 12px; border: 1px solid #d9e9fb; border-radius: 8px; background: #f5faff; }
+.jurisdiction-summary-result > p { margin: 0 46px 10px 0; color: #303133; font-size: 12px; line-height: 1.75; }
+.jurisdiction-summary-result > .sql-button { position: absolute; right: 9px; top: 9px; }
+.jurisdiction-summary-list { max-height: 240px; overflow: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 10px; }
+.jurisdiction-summary-row { min-width: 0; display: flex; justify-content: space-between; gap: 6px; padding: 5px 6px; background: rgba(255,255,255,.8); border-radius: 4px; font-size: 11px; }
+.jurisdiction-summary-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jurisdiction-summary-row strong { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .total-statistic-wrap { position: relative; padding: 14px 54px 14px 12px; border: 1px solid #d9e9fb; border-radius: 8px; background: #f5faff; }
 .total-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 8px; }
 .total-statistic { min-width: 0; text-align: center; }

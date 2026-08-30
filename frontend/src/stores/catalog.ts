@@ -37,7 +37,7 @@ export const useCatalogStore = defineStore('catalog', {
       await this.loadTemplates()
       return result
     },
-    async uploadTemplate(file: File, data: { name?: string; category: string; description?: string; status?: string }) {
+    async uploadTemplate(file: File, data: { name?: string; description?: string; status?: string }) {
       const result = await uploadTemplate(file, data)
       await this.loadTemplates()
       return result

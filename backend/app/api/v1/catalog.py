@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.response import ok
+from app.core.security import CurrentUser, get_current_user
 from app.schemas.catalog import (
     DataSourceCreateRequest,
     DataSourceUpdateRequest,
@@ -18,8 +19,11 @@ from app.services.catalog_service import CatalogService
 router = APIRouter()
 
 
-def get_service(db: Session = Depends(get_db)) -> CatalogService:
-    return CatalogService(db)
+def get_service(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> CatalogService:
+    return CatalogService(db, current_user)
 
 
 @router.get("/templates")
@@ -36,12 +40,11 @@ def create_template(req: ReportTemplateCreateRequest, service: CatalogService = 
 async def upload_template(
     file: UploadFile = File(...),
     name: str | None = Form(default=None),
-    category: str = Form(default="daily"),
     description: str = Form(default=""),
     status_value: str = Form(default="enabled", alias="status"),
     service: CatalogService = Depends(get_service),
 ):
-    return ok(await service.upload_template(file, name, category, description, status_value))
+    return ok(await service.upload_template(file, name, description=description, status_value=status_value))
 
 
 @router.get("/templates/{template_id}/download")

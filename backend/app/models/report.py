@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, JSON, String, Text
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -33,7 +34,8 @@ class ReportDocument(Base):
     editor_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     content_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     draft_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    html_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Word 模板转换后的内联样式 HTML 很容易超过 MySQL TEXT 的 64KB 上限。
+    html_snapshot: Mapped[str | None] = mapped_column(Text().with_variant(LONGTEXT(), "mysql"), nullable=True)
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=local_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=local_now, onupdate=local_now)
