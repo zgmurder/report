@@ -18,7 +18,7 @@ scripts   本地启动脚本
 ```bash
 cd backend
 pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+..\scripts\start-backend.bat
 ```
 
 前端：

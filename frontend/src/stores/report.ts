@@ -105,7 +105,14 @@ export const useReportStore = defineStore('report', {
       this.editingContent = this.currentReport.content_json || target
       this.htmlSnapshot = this.currentReport.html_snapshot || htmlSnapshot || ''
       this.editorConfig = this.currentReport.editor_config || editorConfig
-      await this.loadReports()
+      const summary = this.reports.find((item) => item.id === id)
+      if (summary) {
+        summary.title = this.currentReport.title
+        summary.status = this.currentReport.status
+        summary.folder_id = this.currentReport.folder_id
+        summary.updated_at = this.currentReport.updated_at
+        this.reports.sort((left, right) => right.updated_at.localeCompare(left.updated_at) || right.id - left.id)
+      }
     },
   },
 })

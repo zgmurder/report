@@ -6,6 +6,9 @@ export interface ReportTemplateItem {
   category: string
   description: string
   content_json?: Record<string, unknown>
+  original_filename?: string | null
+  file_size?: number | null
+  mime_type?: string | null
   status: string
   created_at: string
   updated_at: string
@@ -45,6 +48,44 @@ export function listTemplates() {
 
 export function createTemplate(data: TemplatePayload) {
   return apiPost<ReportTemplateItem>('/catalog/templates', data)
+}
+
+export function uploadTemplate(file: File, data: { name?: string; category: string; description?: string; status?: string }) {
+  const form = new FormData()
+  form.append('file', file)
+  if (data.name) form.append('name', data.name)
+  form.append('category', data.category)
+  form.append('description', data.description || '')
+  form.append('status', data.status || 'enabled')
+  return apiPost<ReportTemplateItem>('/catalog/templates/upload', form)
+}
+
+export interface ReportTemplateContent {
+  id: number
+  name: string
+  original_filename: string
+  html: string
+}
+
+export function getTemplateContent(id: number) {
+  return apiGet<ReportTemplateContent>(`/catalog/templates/${id}/content`)
+}
+
+export async function downloadTemplate(id: number, filename: string) {
+  const token = localStorage.getItem('report_access_token')
+  const response = await fetch(`/api/v1/catalog/templates/${id}/download`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) throw new Error(response.status === 404 ? '该模板没有可下载的 Word 文件' : '模板下载失败')
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename || '报告模板.docx'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 export function updateTemplate(id: number, data: TemplatePayload) {

@@ -12,6 +12,7 @@ import {
   updateComponent,
   updateDataSource,
   updateTemplate,
+  uploadTemplate,
   type ComponentPayload,
   type DataSourceItem,
   type DataSourcePayload,
@@ -33,6 +34,11 @@ export const useCatalogStore = defineStore('catalog', {
     },
     async saveTemplate(data: TemplatePayload, id?: number) {
       const result = id ? await updateTemplate(id, data) : await createTemplate(data)
+      await this.loadTemplates()
+      return result
+    },
+    async uploadTemplate(file: File, data: { name?: string; category: string; description?: string; status?: string }) {
+      const result = await uploadTemplate(file, data)
       await this.loadTemplates()
       return result
     },

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { UmoEditor } from '@umoteam/editor'
-import { Node } from '@tiptap/core'
+import { Extension, Node } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import '@umoteam/editor/style'
 import type { EditorPageConfig, ReportEditorConfig } from '@/api/report'
 import type { ReportQueryBlock } from '@/api/reportSearch'
+import { getTemplateContent, listTemplates, type ReportTemplateItem } from '@/api/catalog'
 
 const props = withDefaults(
   defineProps<{
@@ -59,6 +60,14 @@ const shellRef = ref<HTMLElement | null>(null)
 const umoRef = ref<UmoEditorInstance | null>(null)
 const queryBlockRegistry = new Map<string, ReportQueryBlock>()
 const restoringInitialContent = ref(true)
+const templateMenuVisible = ref(false)
+const templateMenuLoading = ref(false)
+const templateInsertLoadingId = ref<number | null>(null)
+const templateMenuItems = ref<ReportTemplateItem[]>([])
+const templateMenuQuery = ref('')
+const templateMenuActiveIndex = ref(0)
+const templateMenuPosition = ref({ left: 0, top: 0 })
+let templateTriggerPosition: number | null = null
 const currentEditorConfig = ref<ReportEditorConfig>(normalizeEditorConfig(props.editorConfig))
 const AUTO_SAVE_DEBOUNCE_MS = 2000
 let autoSaveTimer: number | null = null
@@ -90,10 +99,10 @@ interface UmoPageParams {
 interface TiptapEditorInstance {
   commands?: {
     insertContent?: (content: unknown) => boolean
-    insertContentAt?: (position: number, content: unknown) => boolean
+    insertContentAt?: (position: number | { from: number; to: number }, content: unknown) => boolean
   }
   chain?: () => { focus: () => { insertContent: (content: unknown) => { run: () => boolean } } }
-  state?: { doc?: { descendants?: (callback: (node: any, position: number) => void) => void }; tr?: any }
+  state?: { selection?: { from: number; empty?: boolean }; doc?: { descendants?: (callback: (node: any, position: number) => void) => void }; tr?: any }
   view?: {
     posAtCoords?: (coords: { left: number; top: number }) => { pos: number } | null
     dispatch?: (transaction: unknown) => void
@@ -104,6 +113,7 @@ interface UmoEditorInstance {
   setContent?: (content: string | Record<string, unknown>, options?: Record<string, unknown>) => void
   getHTML?: () => string
   getJSON?: () => Record<string, unknown>
+  saveContent?: (showMessage?: boolean) => Promise<void>
   setPage?: (params: UmoPageParams) => void
   getPage?: () => unknown
   useEditor?: () => TiptapEditorInstance | undefined
@@ -225,6 +235,122 @@ function handleCreated() {
     }, 0)
   })
 }
+
+function closeTemplateMenu() {
+  templateMenuVisible.value = false
+  templateMenuQuery.value = ''
+  templateMenuActiveIndex.value = 0
+  templateTriggerPosition = null
+}
+
+async function openTemplateMenu(view: any, triggerPosition: number) {
+  if (props.readOnly) return
+  templateTriggerPosition = triggerPosition
+  templateMenuQuery.value = ''
+  templateMenuActiveIndex.value = 0
+  const coords = view.coordsAtPos(Math.min(triggerPosition + 1, view.state.doc.content.size))
+  templateMenuPosition.value = {
+    left: Math.min(coords.left, window.innerWidth - 340),
+    top: Math.min(coords.bottom + 6, window.innerHeight - 320),
+  }
+  templateMenuVisible.value = true
+  if (templateMenuItems.value.length) return
+  templateMenuLoading.value = true
+  try {
+    templateMenuItems.value = (await listTemplates()).filter(
+      (item) => item.status === 'enabled' && Boolean(item.original_filename),
+    )
+  } catch (error) {
+    console.error('模板列表加载失败', error)
+  } finally {
+    templateMenuLoading.value = false
+  }
+}
+
+const filteredTemplateMenuItems = computed(() => {
+  const query = templateMenuQuery.value.trim().toLowerCase()
+  if (!query) return templateMenuItems.value
+  return templateMenuItems.value.filter((item) =>
+    item.name.toLowerCase().includes(query) || item.description.toLowerCase().includes(query),
+  )
+})
+
+function updateTemplateMenuFromEditor(view: any) {
+  if (!templateMenuVisible.value || templateTriggerPosition === null) return
+  const cursor = view.state.selection.from
+  if (!view.state.selection.empty || cursor <= templateTriggerPosition) {
+    closeTemplateMenu()
+    return
+  }
+  const query = view.state.doc.textBetween(templateTriggerPosition + 1, cursor, '', '')
+  if (query.includes('\n') || query.includes('@') || query.length > 30) {
+    closeTemplateMenu()
+    return
+  }
+  templateMenuQuery.value = query
+  templateMenuActiveIndex.value = Math.min(templateMenuActiveIndex.value, Math.max(filteredTemplateMenuItems.value.length - 1, 0))
+}
+
+async function insertTemplateContent(item: ReportTemplateItem) {
+  const editor = umoRef.value?.useEditor?.()
+  if (!editor || templateTriggerPosition === null) return
+  templateInsertLoadingId.value = item.id
+  try {
+    const content = await getTemplateContent(item.id)
+    const cursor = editor.state?.selection?.from ?? templateTriggerPosition + 1
+    const inserted = editor.commands?.insertContentAt?.(
+      { from: templateTriggerPosition, to: cursor },
+      content.html,
+    ) ?? false
+    if (!inserted) throw new Error('模板内容插入失败')
+    closeTemplateMenu()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '模板内容加载失败')
+  } finally {
+    templateInsertLoadingId.value = null
+  }
+}
+
+const templateMentionExtension = Extension.create({
+  name: 'reportTemplateMention',
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      view: () => ({
+        update(view) {
+          updateTemplateMenuFromEditor(view)
+        },
+      }),
+      props: {
+        handleTextInput(view, from, _to, text) {
+          if (text !== '@') return false
+          window.setTimeout(() => openTemplateMenu(view, from), 0)
+          return false
+        },
+        handleKeyDown(_view, event) {
+          if (!templateMenuVisible.value) return false
+          const items = filteredTemplateMenuItems.value
+          if (event.key === 'Escape') {
+            closeTemplateMenu()
+            return true
+          }
+          if (event.key === 'ArrowDown') {
+            templateMenuActiveIndex.value = items.length ? (templateMenuActiveIndex.value + 1) % items.length : 0
+            return true
+          }
+          if (event.key === 'ArrowUp') {
+            templateMenuActiveIndex.value = items.length ? (templateMenuActiveIndex.value - 1 + items.length) % items.length : 0
+            return true
+          }
+          if (event.key === 'Enter' && items[templateMenuActiveIndex.value]) {
+            void insertTemplateContent(items[templateMenuActiveIndex.value])
+            return true
+          }
+          return false
+        },
+      },
+    })]
+  },
+})
 
 function insertContent(content: unknown, position?: number) {
   const editor = umoRef.value?.useEditor?.()
@@ -544,8 +670,14 @@ function scheduleAutoSave() {
     if (sequence !== autoSaveSequence) return
     const html = umoRef.value?.getHTML?.() || props.modelValue
     if (!html?.trim() || html === '<p></p>') return
-    const documentJson = umoRef.value?.getJSON?.() || props.documentJson || null
     try {
+      // 必须通过 Umo Editor 自身的保存入口执行，成功后它才会同步 savedAt，
+      // 否则服务器虽然已保存，工具栏仍会一直显示“文档未保存”。
+      if (umoRef.value?.saveContent) {
+        await umoRef.value.saveContent(false)
+        return
+      }
+      const documentJson = umoRef.value?.getJSON?.() || props.documentJson || null
       await props.saveHandler?.(html, updateEditorConfig(), documentJson)
     } catch (error) {
       console.error('报告自动保存失败', error)
@@ -603,6 +735,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearAutoSaveTimer()
+  closeTemplateMenu()
 })
 
 defineExpose({
@@ -615,7 +748,7 @@ defineExpose({
 
 const editorOptions = computed(() => ({
   locale: 'zh-CN',
-  extensions: [reportQueryBlockExtension],
+  extensions: [reportQueryBlockExtension, templateMentionExtension],
   height: '100%',
   document: {
     title: props.title,
@@ -720,6 +853,37 @@ const editorOptions = computed(() => ({
         </button>
       </template>
     </UmoEditor>
+
+    <div
+      v-if="templateMenuVisible"
+      class="template-mention-menu"
+      :style="{ left: `${templateMenuPosition.left}px`, top: `${templateMenuPosition.top}px` }"
+      @mousedown.prevent
+    >
+      <div class="template-mention-title">
+        <strong>插入模板</strong>
+        <span v-if="templateMenuQuery">搜索：{{ templateMenuQuery }}</span>
+        <span v-else>输入名称可筛选</span>
+      </div>
+      <div v-if="templateMenuLoading" class="template-mention-empty">正在加载模板...</div>
+      <div v-else-if="!filteredTemplateMenuItems.length" class="template-mention-empty">没有可用的 Word 模板</div>
+      <button
+        v-for="(item, index) in filteredTemplateMenuItems"
+        :key="item.id"
+        type="button"
+        class="template-mention-item"
+        :class="{ active: index === templateMenuActiveIndex }"
+        :disabled="templateInsertLoadingId !== null"
+        @mouseenter="templateMenuActiveIndex = index"
+        @click="insertTemplateContent(item)"
+      >
+        <span class="template-mention-icon">W</span>
+        <span class="template-mention-info">
+          <strong>{{ item.name }}</strong>
+          <small>{{ templateInsertLoadingId === item.id ? '正在加载内容...' : item.original_filename }}</small>
+        </span>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -729,6 +893,56 @@ const editorOptions = computed(() => ({
   min-height: 0;
   background: #f5f6f8;
 }
+
+.template-mention-menu {
+  position: fixed;
+  z-index: 4000;
+  width: 320px;
+  max-height: 300px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .16);
+}
+
+.template-mention-title {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 9px;
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+.template-mention-title strong { color: #262626; }
+.template-mention-empty { padding: 24px 10px; color: #8c8c8c; text-align: center; }
+.template-mention-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+}
+.template-mention-item:hover, .template-mention-item.active { background: #e6f7ff; }
+.template-mention-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 5px;
+  background: #1890ff;
+  color: #fff;
+  font-weight: 700;
+}
+.template-mention-info { min-width: 0; }
+.template-mention-info strong, .template-mention-info small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.template-mention-info small { margin-top: 2px; color: #8c8c8c; }
 
 .umo-shell :deep(.umo-editor),
 .umo-shell :deep(.umo-editor-container),

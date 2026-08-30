@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -28,6 +30,34 @@ def list_templates(service: CatalogService = Depends(get_service)):
 @router.post("/templates")
 def create_template(req: ReportTemplateCreateRequest, service: CatalogService = Depends(get_service)):
     return ok(service.create_template(req))
+
+
+@router.post("/templates/upload")
+async def upload_template(
+    file: UploadFile = File(...),
+    name: str | None = Form(default=None),
+    category: str = Form(default="daily"),
+    description: str = Form(default=""),
+    status_value: str = Form(default="enabled", alias="status"),
+    service: CatalogService = Depends(get_service),
+):
+    return ok(await service.upload_template(file, name, category, description, status_value))
+
+
+@router.get("/templates/{template_id}/download")
+def download_template(template_id: int, service: CatalogService = Depends(get_service)):
+    filename, media_type, content = service.download_template(template_id)
+    encoded_filename = quote(filename)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
+    )
+
+
+@router.get("/templates/{template_id}/content")
+def get_template_content(template_id: int, service: CatalogService = Depends(get_service)):
+    return ok(service.get_template_content(template_id))
 
 
 @router.put("/templates/{template_id}")

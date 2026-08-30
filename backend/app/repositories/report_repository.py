@@ -27,8 +27,31 @@ class ReportRepository:
         return self._to_detail(row)
 
     def list(self) -> list[ReportItem]:
-        rows = self.db.scalars(select(ReportDocument).order_by(ReportDocument.updated_at.desc(), ReportDocument.id.desc())).all()
-        return [self._to_item(row) for row in rows]
+        # 列表页只读取摘要字段。content_json/editor_document 和 html_snapshot 可能很大，
+        # 将整行参与 ORDER BY 会让 MySQL 的 filesort 很容易耗尽 sort buffer。
+        rows = self.db.execute(
+            select(
+                ReportDocument.id,
+                ReportDocument.title,
+                ReportDocument.report_type,
+                ReportDocument.status,
+                ReportDocument.folder_id,
+                ReportDocument.created_at,
+                ReportDocument.updated_at,
+            ).order_by(ReportDocument.updated_at.desc(), ReportDocument.id.desc())
+        ).all()
+        return [
+            ReportItem(
+                id=row.id,
+                title=row.title,
+                report_type=row.report_type,
+                status=row.status,
+                folder_id=row.folder_id,
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+            for row in rows
+        ]
 
     def folder_exists(self, folder_id: int | None) -> bool:
         if folder_id is None:

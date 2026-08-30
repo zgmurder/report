@@ -83,6 +83,9 @@ class CatalogRepository:
         self.ensure_seed_data()
         return self.db.scalars(select(ReportTemplate).order_by(ReportTemplate.updated_at.desc(), ReportTemplate.id.desc())).all()
 
+    def get_template(self, template_id: int) -> ReportTemplate | None:
+        return self.db.get(ReportTemplate, template_id)
+
     def create_template(self, data: dict) -> ReportTemplate:
         row = ReportTemplate(**data)
         self.db.add(row)
@@ -93,8 +96,13 @@ class CatalogRepository:
     def update_template(self, template_id: int, data: dict) -> ReportTemplate | None:
         return self._update(ReportTemplate, template_id, data)
 
-    def delete_template(self, template_id: int) -> bool:
-        return self._delete(ReportTemplate, template_id)
+    def delete_template(self, template_id: int) -> ReportTemplate | None:
+        row = self.db.get(ReportTemplate, template_id)
+        if not row:
+            return None
+        self.db.delete(row)
+        self.db.commit()
+        return row
 
     def list_components(self) -> list[StatComponent]:
         self.ensure_seed_data()

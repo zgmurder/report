@@ -30,6 +30,22 @@ def init_db() -> None:
         with engine.begin() as conn:
             for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs", "departments", "sys_users", "statistics_dictionary_exclusions"):
                 conn.execute(text(f"ALTER TABLE {table_name} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+            template_columns = {
+                "original_filename": "VARCHAR(255) NULL",
+                "file_path": "VARCHAR(500) NULL",
+                "file_size": "INT NULL",
+                "mime_type": "VARCHAR(150) NULL",
+            }
+            for column_name, definition in template_columns.items():
+                has_column = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'report_templates' AND COLUMN_NAME = :column_name"
+                    ),
+                    {"column_name": column_name},
+                ).scalar()
+                if not has_column:
+                    conn.execute(text(f"ALTER TABLE report_templates ADD COLUMN {column_name} {definition}"))
             has_folder_id = conn.execute(
                 text(
                     "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "

@@ -5,19 +5,19 @@ from pydantic import BaseModel, Field
 
 
 class ReportTemplateCreateRequest(BaseModel):
-    name: str
-    category: str = "daily"
-    description: str = ""
+    name: str = Field(..., min_length=1, max_length=200)
+    category: str = Field(default="daily", min_length=1, max_length=50)
+    description: str = Field(default="", max_length=500)
     content_json: dict[str, Any] = Field(default_factory=dict)
-    status: str = "enabled"
+    status: str = Field(default="enabled", min_length=1, max_length=20)
 
 
 class ReportTemplateUpdateRequest(BaseModel):
-    name: str | None = None
-    category: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    category: str | None = Field(default=None, min_length=1, max_length=50)
+    description: str | None = Field(default=None, max_length=500)
     content_json: dict[str, Any] | None = None
-    status: str | None = None
+    status: str | None = Field(default=None, min_length=1, max_length=20)
 
 
 class ReportTemplateItem(BaseModel):
@@ -32,6 +32,9 @@ class ReportTemplateItem(BaseModel):
 
 class ReportTemplateDetail(ReportTemplateItem):
     content_json: dict[str, Any] = Field(default_factory=dict)
+    original_filename: str | None = None
+    file_size: int | None = None
+    mime_type: str | None = None
 
 
 class StatComponentCreateRequest(BaseModel):
