@@ -4,7 +4,7 @@ from io import BytesIO
 from bs4 import BeautifulSoup, NavigableString, Tag
 from docx import Document
 from docx.enum.section import WD_ORIENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
@@ -92,10 +92,13 @@ class ExportService:
         name = node.name.lower()
         if name in {"h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote", "pre"}:
             level = min(int(name[1]), 6) if name.startswith("h") else None
-            paragraph = document.add_heading("", level=level) if level else document.add_paragraph()
+            # Do not use document.add_heading(): Word/WPS applies its built-in
+            # Heading theme (blue text, theme font and extra spacing), which is
+            # not present in UMO's canvas and overrides the WYSIWYG result.
+            paragraph = document.add_paragraph()
             if name == "blockquote":
                 paragraph.paragraph_format.left_indent = Cm(0.74)
-            self._apply_paragraph_style(paragraph, node)
+            self._apply_paragraph_style(paragraph, node, heading_level=level)
             self._append_inline_content(paragraph, node, heading_level=level)
             return
         if name in {"ul", "ol"}:
@@ -122,6 +125,10 @@ class ExportService:
                     styles = self._styles(html_cell)
                     if styles.get("background-color"):
                         self._set_cell_shading(cell, styles["background-color"])
+            return
+        if name == "div" and "umo-page-break" in (node.attrs.get("class") or []):
+            paragraph = document.add_paragraph()
+            paragraph.add_run().add_break(WD_BREAK.PAGE)
             return
         if name == "hr":
             paragraph = document.add_paragraph()
@@ -175,7 +182,7 @@ class ExportService:
                 else:
                     self._append_inline_content(paragraph, child, state, heading_level, force_bold)
 
-    def _apply_paragraph_style(self, paragraph, node: Tag) -> None:
+    def _apply_paragraph_style(self, paragraph, node: Tag, heading_level: int | None = None) -> None:
         styles = self._styles(node)
         alignment = styles.get("text-align") or node.attrs.get("align")
         paragraph.alignment = {
@@ -193,6 +200,20 @@ class ExportService:
                 value = self._css_length_pt(line_height)
                 if value is not None:
                     paragraph.paragraph_format.line_spacing = Pt(value)
+        elif heading_level:
+            # UMO's default heading line height. Heading styles are computed by
+            # the browser and therefore are not included in getHTML().
+            paragraph.paragraph_format.line_spacing = 1.75
+
+        # Reproduce UMO/browser heading margins instead of Word theme spacing.
+        if heading_level:
+            default_size = {1: 26, 2: 22, 3: 18, 4: 16, 5: 14, 6: 12}[heading_level]
+            paragraph.paragraph_format.space_before = Pt(default_size * 0.67)
+            paragraph.paragraph_format.space_after = Pt(default_size * 0.67)
+        else:
+            paragraph.paragraph_format.space_before = Pt(0)
+            paragraph.paragraph_format.space_after = Pt(0)
+
         for css_name, attr in (
             ("margin-top", "space_before"),
             ("margin-bottom", "space_after"),
@@ -217,17 +238,19 @@ class ExportService:
 
         size = self._css_length_pt(styles.get("font-size"))
         if size is None and heading_level:
-            size = {1: 24, 2: 20, 3: 18, 4: 16, 5: 14, 6: 12}.get(heading_level)
+            size = {1: 26, 2: 22, 3: 18, 4: 16, 5: 14, 6: 12}.get(heading_level)
         if size is not None:
             run.font.size = Pt(size)
 
-        family = str(styles.get("font-family", "")).split(",")[0].strip(" '\"")
-        if family:
-            run.font.name = family
-            run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), family)
-        color = self._normalise_color(styles.get("color"))
-        if color:
-            run.font.color.rgb = RGBColor.from_string(color)
+        family = str(styles.get("font-family", "")).split(",")[0].strip(" '\"") or "Microsoft YaHei"
+        run.font.name = family
+        fonts = run._element.get_or_add_rPr().rFonts
+        fonts.set(qn("w:ascii"), family)
+        fonts.set(qn("w:hAnsi"), family)
+        fonts.set(qn("w:eastAsia"), family)
+        fonts.set(qn("w:cs"), family)
+        color = self._normalise_color(styles.get("color")) or "000000"
+        run.font.color.rgb = RGBColor.from_string(color)
         background = self._normalise_color(styles.get("background-color") or styles.get("background"))
         if background:
             shading = OxmlElement("w:shd")

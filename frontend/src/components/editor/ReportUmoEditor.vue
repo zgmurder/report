@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { UmoEditor } from '@umoteam/editor'
 import '@umoteam/editor/style'
 import type { EditorPageConfig, ReportEditorConfig } from '@/api/report'
@@ -44,6 +44,9 @@ const shellRef = ref<HTMLElement | null>(null)
 const umoRef = ref<UmoEditorInstance | null>(null)
 const restoringInitialContent = ref(true)
 const currentEditorConfig = ref<ReportEditorConfig>(normalizeEditorConfig(props.editorConfig))
+const AUTO_SAVE_DEBOUNCE_MS = 2000
+let autoSaveTimer: number | null = null
+let autoSaveSequence = 0
 
 interface UmoEditorPayload {
   html?: string
@@ -179,13 +182,40 @@ function handleCreated() {
   })
 }
 
+function clearAutoSaveTimer() {
+  if (autoSaveTimer === null) return
+  window.clearTimeout(autoSaveTimer)
+  autoSaveTimer = null
+}
+
+function scheduleAutoSave() {
+  if (props.readOnly || !props.saveHandler || restoringInitialContent.value) return
+  clearAutoSaveTimer()
+  const sequence = ++autoSaveSequence
+  autoSaveTimer = window.setTimeout(async () => {
+    autoSaveTimer = null
+    if (sequence !== autoSaveSequence) return
+    const html = umoRef.value?.getHTML?.() || props.modelValue
+    if (!html?.trim() || html === '<p></p>') return
+    const documentJson = umoRef.value?.getJSON?.() || props.documentJson || null
+    try {
+      await props.saveHandler?.(html, updateEditorConfig(), documentJson)
+    } catch (error) {
+      console.error('报告自动保存失败', error)
+    }
+  }, AUTO_SAVE_DEBOUNCE_MS)
+}
+
 function handlePageOrientationChanged(payload: unknown) {
   const data = payload as { pageOrientation?: unknown }
   const orientation = data.pageOrientation === 'landscape' ? 'landscape' : 'portrait'
   updateEditorConfig({ ...readEditorConfig().page, orientation })
+  scheduleAutoSave()
 }
 
 async function exportWord() {
+  clearAutoSaveTimer()
+  autoSaveSequence += 1
   if (!props.exportWordHandler) return
   const html = umoRef.value?.getHTML?.() || props.modelValue
   if (!html?.trim()) return
@@ -215,6 +245,10 @@ onMounted(() => {
   nextTick(applyEditorConfig)
 })
 
+onBeforeUnmount(() => {
+  clearAutoSaveTimer()
+})
+
 const editorOptions = computed(() => ({
   locale: 'zh-CN',
   height: '100%',
@@ -229,9 +263,9 @@ const editorOptions = computed(() => ({
     autofocus: false,
     enableBubbleMenu: !props.readOnly,
     enableBlockMenu: !props.readOnly,
+    // Disable interval saving and use a trailing-edge debounce instead.
     autoSave: {
-      enabled: true,
-      interval: 3000,
+      enabled: false,
     },
   },
   toolbar: {
@@ -256,9 +290,14 @@ const editorOptions = computed(() => ({
       : umoRef.value?.getJSON?.() || null
     if (typeof html === 'string') emit('update:modelValue', html)
     emit('update:documentJson', documentJson)
-    nextTick(() => updateEditorConfig())
+    nextTick(() => {
+      updateEditorConfig()
+      scheduleAutoSave()
+    })
   },
   onSave: async (payload: unknown, pagePayload: unknown, documentPayload: unknown) => {
+    clearAutoSaveTimer()
+    autoSaveSequence += 1
     const data = payload as UmoEditorPayload
     const documentData = documentPayload as UmoDocumentPayload | undefined
     const html = documentData?.content ?? data.html ?? data.editor?.getHTML?.() ?? data.getHTML?.() ?? props.modelValue
