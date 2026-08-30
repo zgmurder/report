@@ -11,6 +11,11 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const showDictionaryConfig = ref(false)
+const activeNavIndex = computed(() => workbenchNavItems.findIndex((item) => isActive(item.path)))
+const activeNavIndicatorStyle = computed(() => ({
+  opacity: activeNavIndex.value >= 0 ? 1 : 0,
+  transform: `translateX(calc(${Math.max(activeNavIndex.value, 0) * 100}% + ${Math.max(activeNavIndex.value, 0) * 4}px))`,
+}))
 const userOptions = computed(() => [
   ...(userStore.user?.roles.includes('admin')
     ? [{ label: '字典配置', key: 'dictionary-config', icon: () => h(NIcon, null, { default: () => h(BookOpenCheck) }) }]
@@ -49,6 +54,7 @@ function handleUserAction(key: string) {
       </div>
 
       <nav class="main-nav">
+        <span class="nav-indicator" :style="activeNavIndicatorStyle" aria-hidden="true" />
         <button
           v-for="item in workbenchNavItems"
           :key="item.key"
@@ -141,51 +147,78 @@ function handleUserAction(key: string) {
 }
 
 .main-nav {
+  --nav-item-width: 108px;
+  --nav-gap: 4px;
+  position: relative;
   flex: 1;
   display: flex;
   justify-content: flex-start;
-  align-items: stretch;
-  gap: 4px;
+  align-items: center;
+  gap: var(--nav-gap);
+}
+
+.nav-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--nav-item-width);
+  height: 2px;
+  pointer-events: none;
+  transition: transform .32s cubic-bezier(.22, 1, .36, 1), opacity .2s ease;
+}
+
+.nav-indicator::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-primary);
 }
 
 .nav-item {
   position: relative;
-  min-width: 88px;
-  height: 100%;
-  padding: 0 18px;
+  z-index: 1;
+  width: var(--nav-item-width);
+  height: 38px;
+  padding: 0 14px;
   border: 0;
+  border-radius: 8px;
   background: transparent;
   color: #595959;
   display: inline-flex;
-  flex-direction: column;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 7px;
   font-size: 13px;
-  transition: color .2s;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .2s ease, transform .2s ease;
 }
 
 .nav-item span {
-  line-height: 1.2;
+  line-height: 1;
 }
 
 .nav-item:hover {
   color: var(--color-primary);
 }
 
-.nav-item.active {
-  color: var(--color-primary);
+.nav-item:active {
+  transform: translateY(1px);
 }
 
-.nav-item.active::after {
-  content: '';
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 0;
-  height: 2px;
-  background: var(--color-primary);
-  border-radius: 1px 1px 0 0;
+.nav-item:focus-visible {
+  outline: 2px solid rgba(24, 144, 255, .35);
+  outline-offset: 1px;
+}
+
+.nav-item.active {
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 .top-actions {
@@ -235,8 +268,8 @@ function handleUserAction(key: string) {
 @media (max-width: 960px) {
   .brand { min-width: auto; }
   .brand-text { display: none; }
-  .main-nav { justify-content: flex-start; overflow-x: auto; }
-  .nav-item { min-width: 72px; padding: 0 12px; }
+  .main-nav { --nav-item-width: 96px; justify-content: flex-start; overflow-x: auto; }
+  .nav-item { padding: 0 10px; }
   .top-actions { min-width: auto; gap: 12px; }
 }
 </style>

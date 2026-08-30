@@ -59,11 +59,15 @@ export interface SearchMetrics {
   measures: SearchMetric[]
 }
 
-export type SearchAnalysisType = 'standard' | 'jurisdiction_yoy_summary'
+export type SearchAnalysisType = 'standard' | 'jurisdiction' | 'jurisdiction_yoy_summary'
+export type JurisdictionMetric = 'year_on_year' | 'period_on_period' | 'proportion'
+export type SummaryDirection = 'auto' | 'increase' | 'decrease'
 
 export interface SearchQuery {
   source: 'jjd_jjd' | 'fkd_fkd'
   analysis_type?: SearchAnalysisType
+  jurisdiction_metric?: JurisdictionMetric
+  summary_direction?: SummaryDirection
   start_time: string
   end_time: string
   category_codes: string[]
@@ -98,6 +102,8 @@ export interface SearchResult {
   columns: SearchResultColumn[]
   rows: Record<string, unknown>[]
   analysis_type?: SearchAnalysisType
+  jurisdiction_metric?: JurisdictionMetric | null
+  summary_direction?: SummaryDirection | null
   scope_level?: 'police_station' | 'community' | null
   scope_label?: string | null
   summary?: string | null

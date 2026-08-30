@@ -174,7 +174,11 @@ function applyInitialContent() {
   if (!content || (typeof content === 'string' && !content.trim())) return false
   const editor = umoRef.value
   if (!editor?.setContent || !editor.useEditor?.()) return false
-  editor.setContent(content, { emitUpdate: false, focusPosition: null })
+  editor.setContent(content, {
+    emitUpdate: false,
+    focusPosition: 'start',
+    focusOptions: { scrollIntoView: false },
+  })
   return true
 }
 
@@ -621,7 +625,11 @@ function migrateLegacyQueryBlocks(blocks: Record<string, ReportQueryBlock>) {
     migrated += 1
   })
   if (!migrated) return false
-  editor.setContent(document.body.innerHTML, { emitUpdate: true, focusPosition: null })
+  editor.setContent(document.body.innerHTML, {
+    emitUpdate: true,
+    focusPosition: 'start',
+    focusOptions: { scrollIntoView: false },
+  })
   return true
 }
 

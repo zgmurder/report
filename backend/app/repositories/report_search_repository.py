@@ -147,18 +147,25 @@ class ReportSearchRepository:
         ).scalar()
         return str(name or unit_code)
 
-    def execute_jurisdiction_yoy_summary(
+    def execute_jurisdiction_analysis(
         self, query: ReportSearchQuery, unit_code: str, scope_level: str
     ) -> tuple[list[dict], str]:
-        periods = self._comparison_periods(query.start_time, query.end_time, ["year_on_year_rate"])
+        comparison_measures = {
+            "year_on_year": ["year_on_year_rate"],
+            "period_on_period": ["period_on_period_rate"],
+            "proportion": [],
+        }[query.jurisdiction_metric]
+        periods = self._comparison_periods(query.start_time, query.end_time, comparison_measures)
         params: dict = {
             "current_start": periods["current_start"],
             "current_end": periods["current_end"],
-            "year_start": periods["year_start"],
-            "year_end": periods["year_end"],
             "scan_start": periods["scan_start"],
             "limit": query.limit + 1,
         }
+        if query.jurisdiction_metric == "year_on_year":
+            params.update(base_start=periods["year_start"], base_end=periods["year_end"])
+        elif query.jurisdiction_metric == "period_on_period":
+            params.update(base_start=periods["period_start"], base_end=periods["period_end"])
         conditions = [
             "j.`fksj` >= :scan_start",
             "j.`fksj` < :current_end",
@@ -188,8 +195,11 @@ class ReportSearchRepository:
             f"{group_expression} AS scope_code",
             f"{name_expression} AS scope_name",
             f"{self._period_count_expression(SOURCE_CONFIG['fkd_fkd'], ':current_start', ':current_end')} AS event_count",
-            f"{self._period_count_expression(SOURCE_CONFIG['fkd_fkd'], ':year_start', ':year_end')} AS year_base_count",
         ]
+        if query.jurisdiction_metric != "proportion":
+            selections.append(
+                f"{self._period_count_expression(SOURCE_CONFIG['fkd_fkd'], ':base_start', ':base_end')} AS base_count"
+            )
         sql = "\n".join([
             f"SELECT {', '.join(selections)}",
             "FROM `fkd_fkd` AS j",

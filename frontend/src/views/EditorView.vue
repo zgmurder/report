@@ -274,8 +274,8 @@ function insertHtml(fragment: string) {
 function renderQueryBlock(block: ReportQueryBlock) {
   const result = block.result
   const modeLabel = block.mode === 'dynamic' ? '动态数据' : '静态数据'
-  const jurisdictionSummary = result?.analysis_type === 'jurisdiction_yoy_summary'
-    ? `<p style="margin:0 0 10px;line-height:1.8;">${escapeHtml(result.summary || '')}</p><table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(column.key === 'year_on_year_rate' && row[column.key] !== null && row[column.key] !== undefined ? `${Number(row[column.key]).toFixed(2)}%` : String(row[column.key] ?? '—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+  const jurisdictionSummary = result && ['jurisdiction', 'jurisdiction_yoy_summary'].includes(result.analysis_type || '')
+    ? `<p style="margin:0 0 10px;line-height:1.8;">${escapeHtml(result.summary || '')}</p><table style="width:100%;border-collapse:collapse;"><thead><tr>${result.columns.map((column) => `<th style="border:1px solid #d9d9d9;padding:6px 8px;background:#f5f7fa;">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${result.rows.map((row) => `<tr>${result.columns.map((column) => `<td style="border:1px solid #d9d9d9;padding:6px 8px;">${escapeHtml(['year_on_year_rate', 'period_on_period_rate', 'proportion'].includes(column.key) && row[column.key] !== null && row[column.key] !== undefined ? `${Number(row[column.key]).toFixed(2)}%` : String(row[column.key] ?? '—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`
     : ''
   const status = block.error
     ? `<div style="color:#d03050;padding:8px 0;">更新失败：${escapeHtml(block.error)}</div>`
@@ -449,6 +449,7 @@ onMounted(async () => {
     </main>
 
     <ReportAssistantSidebar
+      :report-html="html"
       @generate-draft="generateDraft"
       @insert-html="insertHtml"
       @insert-query-block="insertQueryBlock"

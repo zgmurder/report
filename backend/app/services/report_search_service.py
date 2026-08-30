@@ -128,8 +128,11 @@ class ReportSearchService:
         return ReportSearchBatchResult(items=items)
 
     def query(self, request: ReportSearchQuery, current_user: CurrentUser) -> ReportSearchResult:
-        if request.analysis_type == "jurisdiction_yoy_summary":
-            return self._jurisdiction_yoy_summary(request, current_user)
+        if request.analysis_type in {"jurisdiction", "jurisdiction_yoy_summary"}:
+            # Keep old dynamic blocks compatible with the former analysis type.
+            if request.analysis_type == "jurisdiction_yoy_summary":
+                request = request.model_copy(update={"jurisdiction_metric": "year_on_year"})
+            return self._jurisdiction_analysis(request, current_user)
         dimensions = get_dimensions(request.source)
         measures = get_measures(request.source)
         invalid_dimensions = set(request.dimensions) - set(dimensions)
@@ -184,42 +187,66 @@ class ReportSearchService:
             truncated=truncated,
         )
 
-    def _jurisdiction_yoy_summary(
+    def _jurisdiction_analysis(
         self, request: ReportSearchQuery, current_user: CurrentUser
     ) -> ReportSearchResult:
         if not current_user.unit_code:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前账号未配置部门")
         if request.source != "fkd_fkd":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="辖区同比综述暂仅支持反馈单")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="辖区分析暂仅支持反馈单")
         scope_level = "police_station" if current_user.unit_code == "330782000000" else "community"
         scope_label = "派出所" if scope_level == "police_station" else "社区"
         started = perf_counter()
-        rows, executed_sql = self.repository.execute_jurisdiction_yoy_summary(
+        rows, executed_sql = self.repository.execute_jurisdiction_analysis(
             request, current_user.unit_code, scope_level
         )
         truncated = len(rows) > request.limit
         rows = rows[: request.limit]
-        for row in rows:
-            current = int(row.get("event_count") or 0)
-            base = int(row.pop("year_base_count", 0) or 0)
-            row["year_base_count"] = base
-            row["year_on_year_change"] = current - base
-            row["year_on_year_rate"] = round((current - base) / base * 100, 2) if base else None
-            rate = row["year_on_year_rate"]
-            row["trend"] = "unknown" if rate is None else "up" if rate > 0 else "down" if rate < 0 else "flat"
-        summary = self._build_jurisdiction_summary(rows, scope_label)
+        metric = request.jurisdiction_metric
+        if metric == "proportion":
+            total = sum(int(row.get("event_count") or 0) for row in rows)
+            for row in rows:
+                current = int(row.get("event_count") or 0)
+                row["proportion"] = round(current / total * 100, 2) if total else None
+                row["trend"] = "flat"
+        else:
+            rate_key = "year_on_year_rate" if metric == "year_on_year" else "period_on_period_rate"
+            change_key = "year_on_year_change" if metric == "year_on_year" else "period_on_period_change"
+            base_key = "year_base_count" if metric == "year_on_year" else "period_base_count"
+            for row in rows:
+                current = int(row.get("event_count") or 0)
+                base = int(row.pop("base_count", 0) or 0)
+                row[base_key] = base
+                row[change_key] = current - base
+                row[rate_key] = round((current - base) / base * 100, 2) if base else None
+                rate = row[rate_key]
+                row["trend"] = "unknown" if rate is None else "up" if rate > 0 else "down" if rate < 0 else "flat"
+        summary = self._build_jurisdiction_summary(rows, scope_label, metric, request.summary_direction)
+        if metric == "year_on_year":
+            metric_columns = [
+                SearchResultColumn(key="year_base_count", label="去年同期", type="number"),
+                SearchResultColumn(key="year_on_year_rate", label="同比", type="number"),
+            ]
+        elif metric == "period_on_period":
+            metric_columns = [
+                SearchResultColumn(key="period_base_count", label="上一周期", type="number"),
+                SearchResultColumn(key="period_on_period_rate", label="环比", type="number"),
+            ]
+        else:
+            metric_columns = [SearchResultColumn(key="proportion", label="占比", type="number")]
         return ReportSearchResult(
             source=SearchDataSource(**DATA_SOURCES[request.source]),
             department=self._department(current_user),
-            analysis_type="jurisdiction_yoy_summary",
+            analysis_type="jurisdiction",
+            jurisdiction_metric=metric,
+            summary_direction=request.summary_direction,
             scope_level=scope_level,
             scope_label=scope_label,
             summary=summary,
             columns=[
                 SearchResultColumn(key="scope_name", label=scope_label),
                 SearchResultColumn(key="event_count", label="本期警情", type="number"),
-                SearchResultColumn(key="year_base_count", label="去年同期", type="number"),
-                SearchResultColumn(key="year_on_year_rate", label="同比", type="number"),
+                *metric_columns,
             ],
             rows=rows,
             row_count=len(rows),
@@ -229,44 +256,53 @@ class ReportSearchService:
         )
 
     @staticmethod
-    def _build_jurisdiction_summary(rows: list[dict], scope_label: str) -> str:
+    def _build_jurisdiction_summary(
+        rows: list[dict], scope_label: str, metric: str, direction: str
+    ) -> str:
         def name(row: dict) -> str:
             value = str(row.get("scope_name") or row.get("scope_code") or "未知")
             return value.removesuffix("派出所").removesuffix("社区")
 
-        def with_rate(row: dict) -> str:
-            return f"{name(row)}（{float(row['year_on_year_rate']):.2f}%）"
+        if metric == "proportion":
+            ranked = sorted(rows, key=lambda row: float(row.get("proportion") or 0), reverse=True)[:3]
+            if not ranked:
+                return f"当前条件下暂无可分析的{scope_label}占比数据。"
+            count = len(ranked)
+            names = "、".join(name(row) for row in ranked)
+            rates = "、".join(f"{float(row.get('proportion') or 0):.2f}%" for row in ranked)
+            return f"警情占比居前{count}位的是{names}，分别为{rates}。"
 
-        comparable = [row for row in rows if row.get("year_on_year_rate") is not None]
-        unknown = [row for row in rows if row.get("year_on_year_rate") is None]
-        rising = sorted((row for row in comparable if float(row["year_on_year_rate"]) > 0), key=lambda row: float(row["year_on_year_rate"]), reverse=True)
-        flat = [row for row in comparable if float(row["year_on_year_rate"]) == 0]
-        falling = sorted((row for row in comparable if float(row["year_on_year_rate"]) < 0), key=lambda row: float(row["year_on_year_rate"]))
-        parts: list[str] = []
-        if rising and falling:
-            rise_text = "、".join(with_rate(row) for row in rising[:5]) if len(rising) <= 5 else f"共{len(rising)}个{scope_label}"
-            parts.append(f"{rise_text}同比上升")
-            if flat:
-                flat_text = "、".join(name(row) for row in flat[:5])
-                parts.append(f"{flat_text}同比持平")
-            parts.append(f"其余{len(falling)}个{scope_label}同比下降")
-        elif falling and not rising:
-            parts.append(f"{len(falling)}个{scope_label}同比下降")
-            if flat:
-                parts.append(f"{len(flat)}个{scope_label}同比持平")
-        elif rising and not falling:
-            parts.append(f"{len(rising)}个{scope_label}同比上升")
-            if flat:
-                parts.append(f"{len(flat)}个{scope_label}同比持平")
-        elif flat:
-            parts.append(f"{len(flat)}个{scope_label}同比持平")
-        if falling:
-            parts.append(f"降幅居前三的是{'、'.join(with_rate(row) for row in falling[:3])}")
-        elif rising:
-            parts.append(f"增幅居前三的是{'、'.join(with_rate(row) for row in rising[:3])}")
+        rate_key = "year_on_year_rate" if metric == "year_on_year" else "period_on_period_rate"
+        comparison_label = "同比" if metric == "year_on_year" else "环比"
+        comparable = [row for row in rows if row.get(rate_key) is not None]
+        unknown = [row for row in rows if row.get(rate_key) is None]
+        rising = sorted(
+            (row for row in comparable if float(row[rate_key]) > 0),
+            key=lambda row: float(row[rate_key]), reverse=True,
+        )
+        falling = sorted(
+            (row for row in comparable if float(row[rate_key]) < 0),
+            key=lambda row: float(row[rate_key]),
+        )
+        flat = [row for row in comparable if float(row[rate_key]) == 0]
+        parts = [f"本期{len(rows)}个{scope_label}中，{len(rising)}个{comparison_label}上升、{len(falling)}个下降、{len(flat)}个持平"]
+        selected_direction = direction
+        if selected_direction == "auto":
+            selected_direction = "increase" if len(rising) >= len(falling) else "decrease"
+        ranked = rising if selected_direction == "increase" else falling
+        if ranked:
+            count = min(3, len(ranked))
+            direction_label = "升幅" if selected_direction == "increase" else "降幅"
+            action = "上升" if selected_direction == "increase" else "下降"
+            names = "、".join(name(row) for row in ranked[:count])
+            rates = "、".join(f"{abs(float(row[rate_key])):.2f}%" for row in ranked[:count])
+            parts.append(f"{comparison_label}{direction_label}居前{count}位的是{names}，分别{action}{rates}")
+        else:
+            parts.append(f"无{comparison_label}{'上升' if selected_direction == 'increase' else '下降'}辖区")
         if unknown:
-            parts.append(f"另有{len(unknown)}个{scope_label}因去年同期为零未计算同比")
-        return "，".join(parts) + "。" if parts else f"当前条件下暂无可分析的{scope_label}同比数据。"
+            base_label = "去年同期" if metric == "year_on_year" else "上一周期"
+            parts.append(f"另有{len(unknown)}个{scope_label}因{base_label}为零未计算{comparison_label}")
+        return "。".join(parts) + "。"
 
     @staticmethod
     def _calculate_comparison_metrics(rows: list[dict], selected_measures: list[str], include_proportion: bool) -> None:
