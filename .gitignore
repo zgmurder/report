@@ -12,4 +12,5 @@ backend/storage/station-account-credentials.csv
 *.py[cod]
 *.log
 *.pid
+/nul
 dist/
