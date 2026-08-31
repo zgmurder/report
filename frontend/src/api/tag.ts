@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './request'
 import { buildQuery, wrapData, type DataEnvelope } from '@/utils/apiEnvelope'
+import { ACCESS_TOKEN_KEY, handleUnauthorizedResponse } from '@/utils/authSession'
 
 export interface SmartTag {
   id: string
@@ -164,7 +165,7 @@ export async function restoreAlarmTags(id: string): Promise<DataEnvelope<TagAlar
 
 export async function exportTags(data: TagSearchPayload & { exportType?: 'alarms' | 'people' }) {
   const exportType = data.exportType || 'alarms'
-  const token = localStorage.getItem('report_access_token')
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY)
   const response = await fetch('/api/v1/tags/export', {
     method: 'POST',
     headers: {
@@ -187,6 +188,7 @@ export async function exportTags(data: TagSearchPayload & { exportType?: 'alarms
       keyword: data.keyword || undefined,
     }),
   })
+  if (handleUnauthorizedResponse(response)) throw new Error('登录状态已失效，请重新登录')
   if (!response.ok) {
     let message = '导出失败'
     try {

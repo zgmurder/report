@@ -32,19 +32,24 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
   if (to.meta.public) {
-    if (to.path === '/login' && userStore.isLoggedIn) return '/home/reports'
+    if (to.path === '/login' && userStore.isLoggedIn) {
+      try {
+        await userStore.loadCurrentUser()
+        return '/home/reports'
+      } catch {
+        userStore.logout()
+      }
+    }
     return true
   }
   if (!userStore.isLoggedIn) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
-  if (!userStore.user) {
-    try {
-      await userStore.loadCurrentUser()
-    } catch {
-      userStore.logout()
-      return { path: '/login', query: { redirect: to.fullPath } }
-    }
+  try {
+    await userStore.loadCurrentUser()
+  } catch {
+    userStore.logout()
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
   return true
 })

@@ -406,7 +406,7 @@ function renderQueryBlockElement(
   dom.innerHTML = block
     ? props.renderQueryBlock?.(block) || block.title
     : '<div style="padding:12px;color:#d03050;border:1px solid #f3c7cf;border-radius:8px;">数据块定义不存在</div>'
-  if (interactive && block?.mode === 'dynamic') {
+  if (interactive && !props.readOnly && block?.mode === 'dynamic') {
     dom.style.position = 'relative'
     const refreshButton = document.createElement('button')
     refreshButton.type = 'button'
@@ -614,6 +614,7 @@ const reportQueryBlockExtension = Node.create({
               return true
             },
             drop(view, event) {
+              if (props.readOnly) return false
               const dragEvent = event as DragEvent
               const metricHtml = readDraggedMetricHtml(dragEvent)
               if (metricHtml) {
@@ -895,6 +896,11 @@ defineExpose({
   insertQueryBlockNode,
   migrateLegacyQueryBlocks,
   replaceQueryBlocks,
+  save: async () => {
+    clearAutoSaveTimer()
+    autoSaveSequence += 1
+    await umoRef.value?.saveContent?.(false)
+  },
   getQueryBlockIds: () => collectQueryBlockIds(umoRef.value?.getJSON?.() || null),
 })
 
@@ -979,7 +985,7 @@ const editorOptions = computed(() => ({
     >
       <template #toolbar_export>
         <button
-          v-if="dynamicBlockCount"
+          v-if="!readOnly && dynamicBlockCount"
           class="word-export-button refresh-data-button"
           type="button"
           title="按当前全局参数更新动态数据块"
@@ -1015,7 +1021,7 @@ const editorOptions = computed(() => ({
     </label>
 
     <div
-      v-if="templateMenuVisible"
+      v-if="!readOnly && templateMenuVisible"
       class="template-mention-menu"
       :style="{ left: `${templateMenuPosition.left}px`, top: `${templateMenuPosition.top}px` }"
       @mousedown.prevent

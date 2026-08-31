@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser
+from app.core.security import CurrentUser, is_admin
 from app.repositories.catalog_repository import CatalogRepository
 from app.services.template_file_service import TemplateFileService
 from app.schemas.catalog import (
@@ -16,6 +16,21 @@ from app.schemas.catalog import (
     StatComponentCreateRequest,
     StatComponentItem,
     StatComponentUpdateRequest,
+)
+
+
+SECRET_PLACEHOLDER = "[REDACTED]"
+SECRET_KEY_MARKERS = (
+    "password",
+    "passwd",
+    "pwd",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "access_key",
+    "private_key",
+    "credential",
 )
 
 
@@ -92,49 +107,113 @@ class CatalogService:
         }
 
     def delete_template(self, template_id: int) -> dict[str, bool]:
-        row = self.repository.delete_template(template_id, self.current_user.id)
+        row = self.repository.get_template(template_id, self.current_user.id)
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
-        self.template_files.delete(row.file_path)
+        receipt = self.template_files.recycle(row.file_path)
+        try:
+            deleted = self.repository.delete_template(template_id, self.current_user.id)
+        except Exception:
+            self.template_files.restore_recycled(receipt)
+            raise
+        if not deleted:
+            self.template_files.restore_recycled(receipt)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
+        self.template_files.purge_recycled(receipt)
         return {"deleted": True}
 
     def list_components(self) -> list[StatComponentItem]:
         return [StatComponentItem.model_validate(row, from_attributes=True) for row in self.repository.list_components()]
 
     def create_component(self, req: StatComponentCreateRequest) -> StatComponentItem:
+        self._require_admin()
         row = self.repository.create_component(req.model_dump(mode="json"))
         return StatComponentItem.model_validate(row, from_attributes=True)
 
     def update_component(self, component_id: int, req: StatComponentUpdateRequest) -> StatComponentItem:
+        self._require_admin()
         row = self.repository.update_component(component_id, req.model_dump(exclude_unset=True, mode="json"))
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="组件不存在")
         return StatComponentItem.model_validate(row, from_attributes=True)
 
     def delete_component(self, component_id: int) -> dict[str, bool]:
+        self._require_admin()
         deleted = self.repository.delete_component(component_id)
         if not deleted:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="组件不存在")
         return {"deleted": True}
 
     def list_data_sources(self) -> list[DataSourceItem]:
-        return [DataSourceItem.model_validate(row, from_attributes=True) for row in self.repository.list_data_sources()]
+        self._require_admin()
+        return [self._data_source_item(row) for row in self.repository.list_data_sources()]
 
     def create_data_source(self, req: DataSourceCreateRequest) -> DataSourceItem:
+        self._require_admin()
         row = self.repository.create_data_source(req.model_dump(mode="json"))
-        return DataSourceItem.model_validate(row, from_attributes=True)
+        return self._data_source_item(row)
 
     def update_data_source(self, data_source_id: int, req: DataSourceUpdateRequest) -> DataSourceItem:
-        row = self.repository.update_data_source(data_source_id, req.model_dump(exclude_unset=True, mode="json"))
+        self._require_admin()
+        data = req.model_dump(exclude_unset=True, mode="json")
+        if "config_json" in data:
+            existing = self.repository.get_data_source(data_source_id)
+            if not existing:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="数据源不存在")
+            data["config_json"] = self._preserve_secret_placeholders(data["config_json"], existing.config_json)
+        row = self.repository.update_data_source(data_source_id, data)
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="数据源不存在")
-        return DataSourceItem.model_validate(row, from_attributes=True)
+        return self._data_source_item(row)
 
     def delete_data_source(self, data_source_id: int) -> dict[str, bool]:
+        self._require_admin()
         deleted = self.repository.delete_data_source(data_source_id)
         if not deleted:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="数据源不存在")
         return {"deleted": True}
+
+    def _require_admin(self) -> None:
+        if not is_admin(self.current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要管理员权限")
+
+    @classmethod
+    def _data_source_item(cls, row) -> DataSourceItem:
+        item = DataSourceItem.model_validate(row, from_attributes=True)
+        return item.model_copy(update={"config_json": cls._redact_secrets(item.config_json)})
+
+    @classmethod
+    def _redact_secrets(cls, value, key: str | None = None):
+        if key is not None and cls._is_secret_key(key):
+            return SECRET_PLACEHOLDER
+        if isinstance(value, dict):
+            return {item_key: cls._redact_secrets(item, str(item_key)) for item_key, item in value.items()}
+        if isinstance(value, list):
+            return [cls._redact_secrets(item) for item in value]
+        return value
+
+    @classmethod
+    def _preserve_secret_placeholders(cls, incoming, existing, key: str | None = None):
+        if key is not None and cls._is_secret_key(key) and incoming == SECRET_PLACEHOLDER:
+            return existing
+        if isinstance(incoming, dict):
+            old = existing if isinstance(existing, dict) else {}
+            return {
+                item_key: cls._preserve_secret_placeholders(item, old.get(item_key), str(item_key))
+                for item_key, item in incoming.items()
+            }
+        if isinstance(incoming, list):
+            old = existing if isinstance(existing, list) else []
+            return [
+                cls._preserve_secret_placeholders(item, old[index] if index < len(old) else None)
+                for index, item in enumerate(incoming)
+            ]
+        return incoming
+
+    @staticmethod
+    def _is_secret_key(key: str) -> bool:
+        normalized = key.strip().lower().replace("-", "_")
+        return any(marker in normalized for marker in SECRET_KEY_MARKERS)
 
     @staticmethod
     def _require_text(value: str, message: str) -> str:

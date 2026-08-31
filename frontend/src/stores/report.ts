@@ -20,6 +20,9 @@ import {
   type ReportItem,
 } from '@/api/report'
 
+let reportLoadSequence = 0
+const saveQueues = new Map<number, Promise<unknown>>()
+
 export const useReportStore = defineStore('report', {
   state: () => ({
     reports: [] as ReportItem[],
@@ -81,13 +84,31 @@ export const useReportStore = defineStore('report', {
       }
     },
     async loadReport(id: number) {
-      this.currentReport = await getReport(id)
-      const content = this.currentReport.status === 'draft'
-        ? this.currentReport.draft_json || this.currentReport.content_json
-        : this.currentReport.content_json
+      const sequence = ++reportLoadSequence
+      const report = await getReport(id)
+      if (sequence !== reportLoadSequence) return null
+      this.applyLoadedReport(report)
+      return report
+    },
+    applyLoadedReport(report: ReportItem) {
+      this.currentReport = report
+      let content: ReportContent | null | undefined
+      switch (report.status) {
+        case 'draft':
+          content = report.draft_json || report.content_json
+          break
+        case 'confirmed':
+        case 'archived':
+          content = report.content_json
+          break
+        default: {
+          const exhaustive: never = report.status
+          throw new Error(`不支持的报告状态：${exhaustive}`)
+        }
+      }
       this.editingContent = content ? structuredClone(toRaw(content)) : null
-      this.htmlSnapshot = this.currentReport.html_snapshot || ''
-      this.editorConfig = this.currentReport.editor_config ? structuredClone(toRaw(this.currentReport.editor_config)) : null
+      this.htmlSnapshot = report.html_snapshot || ''
+      this.editorConfig = report.editor_config ? structuredClone(toRaw(report.editor_config)) : null
     },
     async generateDraft(id: number, reportType = 'monthly', sourceQuery: Record<string, unknown> = {}) {
       const result = await generateReportDraft(id, { report_type: reportType, source_query: sourceQuery })
@@ -96,6 +117,7 @@ export const useReportStore = defineStore('report', {
       return result
     },
     async confirmDraft(id: number) {
+      await saveQueues.get(id)?.catch(() => undefined)
       const report = await confirmReportDraft(id)
       await this.loadReport(id)
       await this.loadReports()
@@ -104,19 +126,31 @@ export const useReportStore = defineStore('report', {
     async save(id: number, content: ReportContent | undefined, htmlSnapshot: string | undefined, editorConfig: ReportEditorConfig) {
       const target = content || this.editingContent
       if (!target) return
-      const saveRequest = this.currentReport?.status === 'confirmed' ? saveReportContent : saveReportDraft
-      this.currentReport = await saveRequest(id, target, htmlSnapshot ?? this.htmlSnapshot, editorConfig)
-      this.editingContent = (this.currentReport.status === 'draft'
-        ? this.currentReport.draft_json || this.currentReport.content_json
-        : this.currentReport.content_json) || target
-      this.htmlSnapshot = this.currentReport.html_snapshot || htmlSnapshot || ''
-      this.editorConfig = this.currentReport.editor_config || editorConfig
+      const report = this.currentReport
+      if (!report || report.id !== id) throw new Error('当前报告已切换，请重新保存')
+      if (report.status === 'archived') throw new Error('归档报告为只读，不能保存')
+      const status = report.status
+      const previous = saveQueues.get(id) || Promise.resolve()
+      const operation = previous.catch(() => undefined).then(() => {
+        const saveRequest = status === 'confirmed' ? saveReportContent : saveReportDraft
+        return saveRequest(id, target, htmlSnapshot ?? this.htmlSnapshot, editorConfig)
+      })
+      saveQueues.set(id, operation)
+      let saved: ReportItem
+      try {
+        saved = await operation
+      } finally {
+        if (saveQueues.get(id) === operation) saveQueues.delete(id)
+      }
+      if (this.currentReport?.id !== id) return
+      reportLoadSequence += 1
+      this.applyLoadedReport(saved)
       const summary = this.reports.find((item) => item.id === id)
       if (summary) {
-        summary.title = this.currentReport.title
-        summary.status = this.currentReport.status
-        summary.folder_id = this.currentReport.folder_id
-        summary.updated_at = this.currentReport.updated_at
+        summary.title = saved.title
+        summary.status = saved.status
+        summary.folder_id = saved.folder_id
+        summary.updated_at = saved.updated_at
         this.reports.sort((left, right) => right.updated_at.localeCompare(left.updated_at) || right.id - left.id)
       }
     },

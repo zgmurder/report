@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { ACCESS_TOKEN_KEY, redirectToLogin } from '@/utils/authSession'
 
 export interface ApiResponse<T> {
   code: number
@@ -12,7 +13,7 @@ const request = axios.create({
 })
 
 request.interceptors.request.use((config) => {
-  const token = localStorage.getItem('report_access_token')
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -26,6 +27,7 @@ request.interceptors.response.use((response) => {
   }
   return response
 }, (error) => {
+  if (error?.response?.status === 401) redirectToLogin()
   const detail = error?.response?.data?.detail
   const message = Array.isArray(detail) ? detail[0]?.msg : detail
   return Promise.reject(new Error(message || error?.message || '请求失败'))

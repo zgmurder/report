@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import CHAR, BigInteger, Column, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import CHAR, BigInteger, Column, DateTime, Integer, Numeric, String, Text, UniqueConstraint
 
 from app.core.database import Base
 
@@ -209,6 +209,9 @@ class TagDictV2(Base):
 
 class JqTagResult(Base):
     __tablename__ = "jq_tag_result"
+    __table_args__ = (
+        UniqueConstraint("fkdbh", "tag_path", name="uq_jq_tag_result_fkdbh_tag_path"),
+    )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     fkdbh = Column(String(27), nullable=False)

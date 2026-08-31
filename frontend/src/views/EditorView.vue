@@ -32,18 +32,23 @@ const editorRef = ref<{
   migrateLegacyQueryBlocks?: (blocks: Record<string, ReportQueryBlock>) => boolean
   replaceQueryBlocks?: (blocks: Record<string, ReportQueryBlock>) => boolean
   getQueryBlockIds?: () => string[]
+  save?: () => Promise<void>
 } | null>(null)
 const queryBlocks = ref<Record<string, ReportQueryBlock>>({})
 const activeQueryBlockIds = ref<string[]>([])
 const globalParameters = ref<{ start_time: string; end_time: string } | null>(null)
 const refreshingQueryBlocks = ref(false)
 let queryBlockRefreshSequence = 0
+let currentLoadSequence = 0
 
 const dynamicBlockCount = computed(() => activeQueryBlockIds.value.filter(
   (id) => queryBlocks.value[id]?.mode === 'dynamic',
 ).length)
 
 const title = computed(() => store.currentReport?.title || store.editingContent?.title || '未命名报告')
+const reportStatus = computed(() => store.currentReport?.status)
+const readOnly = computed(() => reportStatus.value === 'archived')
+const confirmingDraft = ref(false)
 
 function isBlankHtml(value: string | null | undefined) {
   if (!value) return true
@@ -129,12 +134,14 @@ async function loadAll() {
 }
 
 async function loadCurrent() {
+  const loadSequence = ++currentLoadSequence
   queryBlockRefreshSequence += 1
   refreshingQueryBlocks.value = false
   activeQueryBlockIds.value = []
   editorReady.value = false
   try {
-    await store.loadReport(reportId.value)
+    const loaded = await store.loadReport(reportId.value)
+    if (!loaded || loadSequence !== currentLoadSequence) return
     selectedFolderId.value = store.currentReport?.folder_id ?? null
     editorConfig.value = store.editorConfig || createDefaultEditorConfig()
     const savedDocument = store.editingContent?.params?.editor_document
@@ -155,6 +162,7 @@ async function loadCurrent() {
     await nextTick()
     editorReady.value = true
   } catch (error) {
+    if (loadSequence !== currentLoadSequence) return
     documentJson.value = null
     html.value = ''
     editorReady.value = false
@@ -263,8 +271,31 @@ function openReport(report: ReportItem) {
 }
 
 async function generateDraft() {
+  if (readOnly.value) return
   const result = await store.generateDraft(reportId.value, 'monthly', {})
   html.value = contentToHtml(result.draft_json)
+}
+
+function confirmDraft() {
+  if (reportStatus.value !== 'draft' || confirmingDraft.value) return
+  dialog.warning({
+    title: '确认报告草稿',
+    content: '确认后报告将转为正式版本。此操作不会由保存或导出自动触发，确定继续吗？',
+    positiveText: '确认草稿',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      confirmingDraft.value = true
+      try {
+        await editorRef.value?.save?.()
+        await store.confirmDraft(reportId.value)
+        message.success('草稿已确认')
+      } catch (error) {
+        message.error(error instanceof Error ? error.message : '草稿确认失败')
+      } finally {
+        confirmingDraft.value = false
+      }
+    },
+  })
 }
 
 function insertHtml(fragment: string) {
@@ -344,7 +375,7 @@ function updateGlobalParameters(value: { start_time: string; end_time: string })
 }
 
 async function refreshDynamicQueryBlocks(requestedIds?: string[]) {
-  if (!globalParameters.value || refreshingQueryBlocks.value) return
+  if (readOnly.value || !globalParameters.value || refreshingQueryBlocks.value) return
   const currentIds = editorRef.value?.getQueryBlockIds?.() || activeQueryBlockIds.value
   syncQueryBlockIds(currentIds)
   const requestedIdSet = requestedIds?.length ? new Set(requestedIds) : null
@@ -394,6 +425,7 @@ async function refreshDynamicQueryBlocks(requestedIds?: string[]) {
 }
 
 async function save(value = html.value, config = editorConfig.value, editorDocument = documentJson.value) {
+  if (readOnly.value) throw new Error('归档报告为只读，不能保存')
   editorConfig.value = config
   documentJson.value = editorDocument
   const content = buildReportContent(value, editorDocument)
@@ -403,10 +435,11 @@ async function save(value = html.value, config = editorConfig.value, editorDocum
 
 async function exportWord(value: string, config = editorConfig.value, editorDocument = documentJson.value) {
   try {
-    await save(value, config, editorDocument)
-    if (store.currentReport?.status !== 'confirmed') {
-      await store.confirmDraft(reportId.value)
+    if (reportStatus.value === 'draft') {
+      message.warning('请先使用“确认草稿”将报告转为正式版本后再导出')
+      return
     }
+    if (reportStatus.value === 'confirmed') await save(value, config, editorDocument)
     await downloadReportDocx(reportId.value, title.value)
     message.success('Word 文档已导出')
   } catch (error) {
@@ -446,6 +479,13 @@ onMounted(async () => {
     />
 
     <main class="editor-center">
+      <div v-if="editorReady && reportStatus === 'draft'" class="draft-action-bar">
+        <span>当前为草稿，保存不会自动确认。</span>
+        <n-button type="primary" size="small" :loading="confirmingDraft" @click="confirmDraft">确认草稿</n-button>
+      </div>
+      <div v-else-if="editorReady && reportStatus === 'archived'" class="draft-action-bar archived-bar">
+        <span>此报告已归档，仅支持查看与导出。</span>
+      </div>
       <div v-if="!editorReady" class="editor-loading">
         <n-spin size="large" description="报告加载中..." />
       </div>
@@ -457,7 +497,8 @@ onMounted(async () => {
         v-model:document-json="documentJson"
         v-model:editor-config="editorConfig"
         :title="title"
-        :save-handler="save"
+        :read-only="readOnly"
+        :save-handler="readOnly ? undefined : save"
         :export-word-handler="exportWord"
         :dynamic-block-count="dynamicBlockCount"
         :refreshing-query-blocks="refreshingQueryBlocks"
@@ -473,6 +514,7 @@ onMounted(async () => {
 
     <ReportAssistantSidebar
       :report-html="html"
+      :read-only="readOnly"
       @generate-draft="generateDraft"
       @insert-html="insertHtml"
       @global-parameters-changed="updateGlobalParameters"
@@ -518,6 +560,32 @@ onMounted(async () => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-center > :deep(.umo-shell) {
+  flex: 1;
+  min-height: 0;
+}
+
+.draft-action-bar {
+  height: 44px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #8a5a00;
+  background: #fff7e6;
+  border-bottom: 1px solid #ffd591;
+}
+
+.archived-bar {
+  color: #606266;
+  background: #f5f7fa;
+  border-bottom-color: #dcdfe6;
 }
 
 .editor-loading {

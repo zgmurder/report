@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from sqlalchemy import String, cast, false, func, or_, text
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser
+from app.core.security import CurrentUser, is_admin
 
 
 @dataclass(frozen=True)
@@ -66,9 +66,8 @@ def resolve_dept_data_scope(
     if not current_user:
         return DeptDataScope(unrestricted=False)
 
-    roles = current_user.roles or []
     username = (current_user.username or "").strip().lower()
-    if "admin" in roles or username in {"admin", "administrator"}:
+    if is_admin(current_user) or username in {"admin", "administrator"}:
         unit_code = (current_user.unit_code or "").strip()
         dept_name = _lookup_dept_name(db, unit_code)
         return DeptDataScope(unrestricted=True, dept_code=unit_code, dept_name=dept_name)

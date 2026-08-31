@@ -1637,7 +1637,11 @@ class AtomicMetricService:
         hot_periods_text = None
         if include_hot_period:
             need_period_compare = bool(
-                include_yoy or include_mom or include_yoy_count or include_mom_count
+                include_yoy
+                or include_mom
+                or include_yoy_count
+                or include_mom_count
+                or rank_sort_by in {'yoy', 'mom'}
             )
 
             def _fetch_hot_period_rows(period_start: str, period_end: str) -> list[dict[str, Any]]:
@@ -1662,8 +1666,8 @@ class AtomicMetricService:
                     {
                         'date_start': period_start,
                         'date_end': period_end,
-                        'dept_code': _pick(merged, 'dept_code', 'deptCode'),
-                        **{k: (_pick(merged, k) or '') for k in dim_filters},
+                        'dept_code': dept_code,
+                        **total_dim_values,
                         **package_bind,
                     },
                     period_sql,
@@ -1679,7 +1683,13 @@ class AtomicMetricService:
             period_rows = _fetch_hot_period_rows(str(date_start), str(date_end))
             mom_map: dict[int, int] = {}
             yoy_map: dict[int, int] = {}
-            if need_period_compare:
+            need_mom_period = bool(
+                include_mom or include_mom_count or rank_sort_by == 'mom'
+            )
+            need_yoy_period = bool(
+                include_yoy or include_yoy_count or rank_sort_by == 'yoy'
+            )
+            if need_mom_period:
                 mom_start, mom_end = cls._shift_metric_period_back(str(date_start), str(date_end))
                 for row in _fetch_hot_period_rows(mom_start, mom_end):
                     try:
@@ -1687,6 +1697,7 @@ class AtomicMetricService:
                         mom_map[slot] = int(float(row.get('total') or 0))
                     except (TypeError, ValueError):
                         continue
+            if need_yoy_period:
                 yoy_start = cls._shift_metric_datetime(str(date_start), years=-1)
                 yoy_end = cls._shift_metric_datetime(str(date_end), years=-1)
                 for row in _fetch_hot_period_rows(yoy_start, yoy_end):

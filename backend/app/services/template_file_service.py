@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import re
 import zipfile
 from html import escape
@@ -19,6 +20,8 @@ MAX_ZIP_ENTRIES = 2000
 MAX_ZIP_ENTRY_SIZE = 50 * 1024 * 1024
 MAX_ZIP_TOTAL_SIZE = 200 * 1024 * 1024
 DOCX_REQUIRED_ENTRIES = {"[Content_Types].xml", "word/document.xml"}
+
+logger = logging.getLogger(__name__)
 
 
 class TemplateFileService:
@@ -89,6 +92,51 @@ class TemplateFileService:
             path.unlink(missing_ok=True)
         except OSError:
             pass
+
+    def recycle(self, file_path: str | None) -> tuple[Path, Path] | None:
+        """Atomically move a template aside before its database row is deleted."""
+        if not file_path:
+            return None
+        original = self._resolve_storage_path(file_path)
+        if not original.exists():
+            return None
+        recycle_dir = self.storage_dir.resolve() / ".recycle"
+        recycled = recycle_dir / f"{uuid4().hex}_{original.name}"
+        try:
+            recycle_dir.mkdir(parents=True, exist_ok=True)
+            original.replace(recycled)
+        except OSError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="模板文件移入回收区失败，未删除模板",
+            ) from exc
+        return original, recycled
+
+    def restore_recycled(self, receipt: tuple[Path, Path] | None) -> None:
+        if receipt is None:
+            return
+        original, recycled = receipt
+        if not recycled.exists():
+            return
+        try:
+            original.parent.mkdir(parents=True, exist_ok=True)
+            recycled.replace(original)
+        except OSError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="模板删除失败且文件恢复失败，请联系管理员",
+            ) from exc
+
+    def purge_recycled(self, receipt: tuple[Path, Path] | None) -> None:
+        if receipt is None:
+            return
+        _, recycled = receipt
+        try:
+            recycled.unlink(missing_ok=True)
+        except OSError:
+            # The database deletion has committed. Keeping the inaccessible file
+            # in .recycle is safer than reporting a failed deletion and retrying.
+            logger.exception("模板数据库记录已删除，但回收区文件清理失败: %s", recycled)
 
     def read(self, file_path: str | None) -> bytes:
         path = self._require_file(file_path)

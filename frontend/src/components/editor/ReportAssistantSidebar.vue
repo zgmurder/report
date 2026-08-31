@@ -23,7 +23,7 @@ import {
   type SearchOptions,
 } from '@/api/reportSearch'
 
-const props = defineProps<{ reportHtml?: string }>()
+const props = withDefaults(defineProps<{ reportHtml?: string; readOnly?: boolean }>(), { readOnly: false })
 
 const emit = defineEmits<{
   generateDraft: []
@@ -345,6 +345,7 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
             </section>
 
             <AtomicMetricPanel
+              v-if="!props.readOnly"
               :category-options="categoryOptions"
               :type-options="typeOptions"
               :detail-options="detailOptions"
@@ -354,13 +355,15 @@ onBeforeUnmount(() => window.removeEventListener('statistics-dictionary-updated'
               :dept-name="currentDepartmentName"
               :loading-classifications="loadingClassifications"
             />
+            <div v-else class="read-only-tip">归档报告为只读，指标查询、拖拽插入和动态刷新已停用。</div>
           </div>
         </n-spin>
       </n-tab-pane>
 
       <n-tab-pane name="ai" class="ai-pane">
         <template #tab><span class="tab-label"><n-icon :component="Bot" />AI</span></template>
-        <ReportPiAssistant :report-html="props.reportHtml" @generate-draft="emit('generateDraft')" @insert-html="emit('insertHtml', $event)" />
+        <ReportPiAssistant v-if="!props.readOnly" :report-html="props.reportHtml" @generate-draft="emit('generateDraft')" @insert-html="emit('insertHtml', $event)" />
+        <div v-else class="read-only-tip">归档报告为只读，AI 生成与内容插入已停用。</div>
       </n-tab-pane>
     </n-tabs>
   </aside>

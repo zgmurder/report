@@ -141,6 +141,9 @@ class CatalogRepository:
         self.ensure_seed_data()
         return self.db.scalars(select(DataSourceConfig).order_by(DataSourceConfig.id.asc())).all()
 
+    def get_data_source(self, data_source_id: int) -> DataSourceConfig | None:
+        return self.db.get(DataSourceConfig, data_source_id)
+
     def create_data_source(self, data: dict) -> DataSourceConfig:
         row = DataSourceConfig(**data)
         self.db.add(row)

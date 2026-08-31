@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS `jq_tag_result` (
   KEY `idx_domain` (`domain`),
   KEY `idx_jq_tag_result_bjsj_fk` (`bjsj`, `fkdbh`),
   KEY `idx_jq_tag_result_fkdwdm` (`fkdwdm`),
-  KEY `idx_jq_tag_result_ajlb` (`ajlbbh`)
+  KEY `idx_jq_tag_result_ajlb` (`ajlbbh`),
+  UNIQUE KEY `uq_jq_tag_result_fkdbh_tag_path` (`fkdbh`, `tag_path`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='警情打标结果表';
 
 -- 已有库补字段/索引（可按需执行）
@@ -60,3 +61,4 @@ CREATE TABLE IF NOT EXISTS `jq_tag_result` (
 -- ALTER TABLE `jq_tag_result` ADD INDEX `idx_jq_tag_result_bjsj_fk` (`bjsj`, `fkdbh`);
 -- ALTER TABLE `jq_tag_result` ADD INDEX `idx_jq_tag_result_fkdwdm` (`fkdwdm`);
 -- ALTER TABLE `jq_tag_result` ADD INDEX `idx_jq_tag_result_ajlb` (`ajlbbh`);
+-- 去重并补唯一约束请执行 ../202603_tag_result_unique.sql（该文件是现有库的规范迁移）。

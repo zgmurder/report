@@ -9,6 +9,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
+from app.domain.report.sanitizer import parse_safe_styles, sanitize_report_html
 from app.schemas.report import ReportContent, ReportDetail, ReportEditorConfig, ReportSection
 
 
@@ -73,7 +74,7 @@ class ExportService:
 
     def _append_html_to_docx(self, document: Document, html: str) -> None:
         """Convert sanitized structured-section HTML into Word content."""
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(sanitize_report_html(html), "html.parser")
         root = soup.body or soup
         for node in root.children:
             if isinstance(node, NavigableString):
@@ -253,13 +254,7 @@ class ExportService:
 
     @staticmethod
     def _styles(node: Tag) -> dict[str, str]:
-        result: dict[str, str] = {}
-        for declaration in str(node.attrs.get("style", "")).split(";"):
-            if ":" not in declaration:
-                continue
-            key, value = declaration.split(":", 1)
-            result[key.strip().lower()] = value.strip()
-        return result
+        return parse_safe_styles(node.attrs.get("style", ""))
 
     @staticmethod
     def _css_length_pt(value: str | None) -> float | None:
@@ -314,7 +309,7 @@ class ExportService:
     def _render_section(self, section: ReportSection) -> str:
         content = section.content or ""
         if section.type == "html":
-            section_body = content
+            section_body = sanitize_report_html(content)
         else:
             section_body = f"<p>{escape(content)}</p>" if content else ""
         source = ""

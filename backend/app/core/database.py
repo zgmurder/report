@@ -6,6 +6,17 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from app.core.config import get_settings
 
 
+def _configured_admin_id(conn) -> int | None:
+    """Resolve legacy-row ownership only to the explicitly configured admin."""
+    username = get_settings().admin_username.strip()
+    if not username:
+        return None
+    return conn.execute(
+        text("SELECT id FROM sys_users WHERE username = :username AND status = 'enabled' LIMIT 1"),
+        {"username": username},
+    ).scalar()
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -28,8 +39,6 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     if engine.dialect.name == "mysql":
         with engine.begin() as conn:
-            # 旧版将别名拆成第二张表；现改为 Excel 映射行与社区代码字段合并成一张表。
-            conn.execute(text("DROP TABLE IF EXISTS community_org_aliases"))
             for table_name in ("report_documents", "report_folders", "report_templates", "stat_components", "data_source_configs", "departments", "sys_users", "statistics_dictionary_exclusions", "community_org_mappings"):
                 conn.execute(text(f"ALTER TABLE {table_name} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
             community_columns = {
@@ -72,10 +81,8 @@ def init_db() -> None:
                 ).scalar()
                 if not has_column:
                     conn.execute(text(f"ALTER TABLE report_templates ADD COLUMN {column_name} {definition}"))
-            # 历史模板没有所有者；首次升级时归属到最早创建的管理员账号，避免直接消失。
-            default_template_owner = conn.execute(
-                text("SELECT id FROM sys_users WHERE status = 'enabled' ORDER BY id ASC LIMIT 1")
-            ).scalar()
+            # 历史模板只归属到显式配置的管理员；无法确认时保留无主状态。
+            default_template_owner = _configured_admin_id(conn)
             if default_template_owner:
                 conn.execute(
                     text("UPDATE report_templates SET created_by = :user_id WHERE created_by IS NULL"),
@@ -116,19 +123,7 @@ def init_db() -> None:
                 {"table_name": dict_table},
             ).scalar()
             if has_dict_table:
-                old_uq = conn.execute(
-                    text(
-                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS "
-                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name "
-                        "AND INDEX_NAME = 'uq_statistics_dictionary_exclusion'"
-                    ),
-                    {"table_name": dict_table},
-                ).scalar()
-                if old_uq:
-                    conn.execute(text(f"ALTER TABLE {dict_table} DROP INDEX uq_statistics_dictionary_exclusion"))
-                default_owner = conn.execute(
-                    text("SELECT id FROM sys_users WHERE status = 'enabled' ORDER BY id ASC LIMIT 1")
-                ).scalar()
+                default_owner = _configured_admin_id(conn)
                 if default_owner:
                     conn.execute(
                         text(
@@ -137,8 +132,7 @@ def init_db() -> None:
                         ),
                         {"user_id": default_owner},
                     )
-                # 无主数据无法归属账号，直接清理
-                conn.execute(text(f"DELETE FROM {dict_table} WHERE created_by IS NULL"))
+                # 找不到显式配置的管理员时保留无主历史数据，避免启动迁移误删。
                 created_by_nullable = conn.execute(
                     text(
                         "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS "
@@ -147,10 +141,14 @@ def init_db() -> None:
                     ),
                     {"table_name": dict_table},
                 ).scalar()
-                if created_by_nullable and str(created_by_nullable).upper() == "YES":
-                    conn.execute(
-                        text(f"ALTER TABLE {dict_table} MODIFY COLUMN created_by INT NOT NULL")
-                    )
+                if default_owner and created_by_nullable and str(created_by_nullable).upper() == "YES":
+                    remaining_unowned = conn.execute(
+                        text(f"SELECT COUNT(*) FROM {dict_table} WHERE created_by IS NULL")
+                    ).scalar()
+                    if not remaining_unowned:
+                        conn.execute(
+                            text(f"ALTER TABLE {dict_table} MODIFY COLUMN created_by INT NOT NULL")
+                        )
                 new_uq = conn.execute(
                     text(
                         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS "

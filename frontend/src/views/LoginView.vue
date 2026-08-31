@@ -10,10 +10,11 @@ const route = useRoute()
 const message = useMessage()
 const userStore = useUserStore()
 const loading = ref(false)
+const isDev = import.meta.env.DEV
 
 const form = reactive({
-  username: 'admin',
-  password: 'admin123',
+  username: isDev ? 'admin' : '',
+  password: isDev ? 'admin123' : '',
 })
 
 const rules: FormRules = {
@@ -21,7 +22,12 @@ const rules: FormRules = {
   password: [{ required: true, message: '请输入密码', trigger: ['blur', 'input'] }],
 }
 
-const redirectPath = computed(() => String(route.query.redirect || '/home/reports'))
+const redirectPath = computed(() => {
+  const value = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  return value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/login')
+    ? value
+    : '/home/reports'
+})
 
 async function submitLogin() {
   if (!form.username.trim() || !form.password) {
@@ -109,9 +115,9 @@ async function submitLogin() {
           <n-button type="primary" block size="large" :loading="loading" class="login-btn" @click="submitLogin">登录系统</n-button>
         </n-form>
 
-        <div class="tips">
-          <span>默认开发账号：admin / admin123</span>
-          <span>生产环境请通过 .env 修改管理员密码</span>
+        <div v-if="isDev" class="tips">
+          <span>开发环境测试账号：admin / admin123</span>
+          <span>账号预填与本提示仅在 DEV 模式显示</span>
         </div>
       </n-card>
     </section>

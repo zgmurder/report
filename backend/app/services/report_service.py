@@ -169,7 +169,7 @@ class ReportService:
 
     def _get_exportable(self, report_id: int) -> ReportDetail:
         report = self.get(report_id)
-        if report.status != "confirmed" or not report.content_json:
+        if report.status not in {"confirmed", "archived"} or not report.content_json:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="报告尚未确认，无法导出正式版本")
         report.content_json = self._validate_content(report.content_json)
         return report

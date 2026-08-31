@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './request'
+import { ACCESS_TOKEN_KEY, handleUnauthorizedResponse } from '@/utils/authSession'
 
 export interface ReportSection {
   id: string
@@ -43,11 +44,13 @@ export interface ReportContent {
   sections: ReportSection[]
 }
 
+export type ReportStatus = 'draft' | 'confirmed' | 'archived'
+
 export interface ReportItem {
   id: number
   title: string
   report_type: string
-  status: string
+  status: ReportStatus
   folder_id?: number | null
   created_at: string
   updated_at: string
@@ -96,7 +99,7 @@ export function getReport(id: number) {
   return apiGet<ReportItem>(`/reports/${id}`)
 }
 
-export function updateReport(id: number, data: { title?: string; folder_id?: number | null; status?: string }) {
+export function updateReport(id: number, data: { title?: string; folder_id?: number | null; status?: ReportStatus }) {
   return apiPut<ReportItem>(`/reports/${id}`, data)
 }
 
@@ -122,10 +125,11 @@ async function readableDownloadError(response: Response, fallback: string) {
 }
 
 export async function downloadReportDocx(id: number, title: string) {
-  const token = localStorage.getItem('report_access_token')
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY)
   const response = await fetch(`/api/v1/reports/${id}/export-docx`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
+  if (handleUnauthorizedResponse(response)) throw new Error('登录状态已失效，请重新登录')
   if (!response.ok) throw new Error(await readableDownloadError(response, 'Word 导出失败'))
   const blob = await response.blob()
   const url = URL.createObjectURL(blob)

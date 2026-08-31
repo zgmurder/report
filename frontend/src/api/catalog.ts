@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './request'
+import { ACCESS_TOKEN_KEY, handleUnauthorizedResponse } from '@/utils/authSession'
 
 export interface ReportTemplateItem {
   id: number
@@ -70,10 +71,11 @@ export function getTemplateContent(id: number) {
 }
 
 export async function downloadTemplate(id: number, filename: string) {
-  const token = localStorage.getItem('report_access_token')
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY)
   const response = await fetch(`/api/v1/catalog/templates/${id}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
+  if (handleUnauthorizedResponse(response)) throw new Error('登录状态已失效，请重新登录')
   if (!response.ok) throw new Error(response.status === 404 ? '该模板没有可下载的 Word 文件' : '模板下载失败')
   const blob = await response.blob()
   const url = URL.createObjectURL(blob)

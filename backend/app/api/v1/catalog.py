@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.response import ok
-from app.core.security import CurrentUser, get_current_user
+from app.core.security import CurrentUser, get_current_user, require_admin
 from app.schemas.catalog import (
     DataSourceCreateRequest,
     DataSourceUpdateRequest,
@@ -78,36 +78,36 @@ def list_components(service: CatalogService = Depends(get_service)):
     return ok(service.list_components())
 
 
-@router.post("/components")
+@router.post("/components", dependencies=[Depends(require_admin)])
 def create_component(req: StatComponentCreateRequest, service: CatalogService = Depends(get_service)):
     return ok(service.create_component(req))
 
 
-@router.put("/components/{component_id}")
+@router.put("/components/{component_id}", dependencies=[Depends(require_admin)])
 def update_component(component_id: int, req: StatComponentUpdateRequest, service: CatalogService = Depends(get_service)):
     return ok(service.update_component(component_id, req))
 
 
-@router.delete("/components/{component_id}")
+@router.delete("/components/{component_id}", dependencies=[Depends(require_admin)])
 def delete_component(component_id: int, service: CatalogService = Depends(get_service)):
     return ok(service.delete_component(component_id))
 
 
-@router.get("/data-sources")
+@router.get("/data-sources", dependencies=[Depends(require_admin)])
 def list_data_sources(service: CatalogService = Depends(get_service)):
     return ok(service.list_data_sources())
 
 
-@router.post("/data-sources")
+@router.post("/data-sources", dependencies=[Depends(require_admin)])
 def create_data_source(req: DataSourceCreateRequest, service: CatalogService = Depends(get_service)):
     return ok(service.create_data_source(req))
 
 
-@router.put("/data-sources/{data_source_id}")
+@router.put("/data-sources/{data_source_id}", dependencies=[Depends(require_admin)])
 def update_data_source(data_source_id: int, req: DataSourceUpdateRequest, service: CatalogService = Depends(get_service)):
     return ok(service.update_data_source(data_source_id, req))
 
 
-@router.delete("/data-sources/{data_source_id}")
+@router.delete("/data-sources/{data_source_id}", dependencies=[Depends(require_admin)])
 def delete_data_source(data_source_id: int, service: CatalogService = Depends(get_service)):
     return ok(service.delete_data_source(data_source_id))

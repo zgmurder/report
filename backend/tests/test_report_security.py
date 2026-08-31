@@ -24,12 +24,43 @@ def _detail(*, status: str = "draft", content=None, draft=None, snapshot=None) -
 
 
 def test_sanitizer_removes_active_content_and_dangerous_attributes():
-    clean = sanitize_report_html('<script>alert(1)</script><p onclick="x()" style="color:red">ok<a href="javascript:alert(1)" target="_blank">x</a></p>')
+    clean = sanitize_report_html('<script>alert(1)</script><p onclick="x()" style="color:red;position:fixed;background:url(javascript:alert(1))">ok<a href="javascript:alert(1)" target="_blank">x</a></p>')
     assert "script" not in clean
     assert "onclick" not in clean
-    assert "style=" not in clean
+    assert 'style="color:red"' in clean
+    assert "position" not in clean
+    assert "url(" not in clean
     assert "javascript:" not in clean
     assert "noopener noreferrer" in clean
+
+
+def test_sanitizer_preserves_export_formatting_css_allowlist():
+    clean = sanitize_report_html(
+        '<p style="text-align:center;margin-left:1.20cm;line-height:1.50;break-before:page">'
+        '<span style="font-family:Microsoft YaHei;font-size:16pt;color:#123456;'
+        'background-color:rgb(240, 240, 240);text-decoration:underline">正文</span></p>'
+    )
+    assert "text-align:center" in clean
+    assert "margin-left:1.20cm" in clean
+    assert "line-height:1.50" in clean
+    assert "break-before:page" in clean
+    assert "font-family:Microsoft YaHei" in clean
+    assert "font-size:16pt" in clean
+    assert "color:#123456" in clean
+    assert "background-color:rgb(240, 240, 240)" in clean
+    assert "text-decoration:underline" in clean
+
+
+def test_sanitizer_rejects_css_escape_and_active_value_payloads():
+    clean = sanitize_report_html(
+        '<span style="color:expression(alert(1));font-family:Arial\\;position:fixed;'
+        'width:calc(100%);border:1px solid #000">safe</span>'
+    )
+    assert "expression" not in clean
+    assert "position" not in clean
+    assert "calc(" not in clean
+    assert "font-family" not in clean
+    assert "border:1px solid #000" in clean
 
 
 def test_sanitizer_removes_nested_dangerous_subtrees_without_crashing():
@@ -76,6 +107,33 @@ def test_export_rejects_draft_and_export_service_never_falls_back_to_draft():
     assert exc.value.status_code == 409
     rendered = ExportService().render_report_html(_detail(status="draft", draft=_content()))
     assert "暂无报告内容" in rendered
+
+
+def test_archived_report_remains_exportable():
+    service = ReportService.__new__(ReportService)
+    service.repository = Mock()
+    service.repository.get.return_value = _detail(status="archived", content=_content())
+    service.export_service = ExportService()
+
+    assert "安全正文" in service.export_html(1)
+
+
+def test_html_and_docx_exports_preserve_sanitized_inline_styles():
+    report = _detail(
+        status="confirmed",
+        content=_content('<p style="text-align:center"><span style="font-size:18pt;color:#123456">样式正文</span></p>'),
+    )
+    rendered = ExportService().render_report_html(report)
+    assert 'style="text-align:center"' in rendered
+    assert "font-size:18pt;color:#123456" in rendered
+
+    import io, zipfile
+    data = ExportService().render_report_docx(report)
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        xml = archive.read("word/document.xml").decode("utf-8")
+    assert 'w:jc w:val="center"' in xml
+    assert 'w:sz w:val="36"' in xml
+    assert 'w:color w:val="123456"' in xml
 
 
 def test_docx_uses_structured_content_not_html_snapshot():
