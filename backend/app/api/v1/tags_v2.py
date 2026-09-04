@@ -21,6 +21,18 @@ def list_tag_v2_catalog(domain: str | None = Query(default=None), db: Session = 
         raise HTTPException(status_code=exc.code if 400 <= exc.code < 600 else 400, detail=exc.message) from exc
 
 
+@router.get("/security-catalog")
+def list_security_tag_catalog(
+    keyword: str | None = Query(default=None),
+    limit: int = Query(default=500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+):
+    try:
+        return ok(TagV2Service.list_security_catalog(db, keyword=keyword, limit=limit))
+    except ServiceException as exc:
+        raise HTTPException(status_code=exc.code if 400 <= exc.code < 600 else 400, detail=exc.message) from exc
+
+
 @router.get("/stats")
 def stats_tag_v2_alarms(
     current_user: CurrentUser = Depends(get_current_user),

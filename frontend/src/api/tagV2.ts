@@ -86,6 +86,24 @@ export interface TagV2Catalog {
   }
 }
 
+export interface SecurityTagItem {
+  id: string
+  tagCode?: string | null
+  tagName: string
+  tagPath: string
+  domain: string
+  name: string
+  category: string
+  source: string
+  personCount?: number
+  hitCount?: number
+  lastTagTime?: string | null
+}
+
+export interface SecurityTagCatalog {
+  tags: SecurityTagItem[]
+}
+
 export interface TagV2SearchPayload {
   includeTags?: string[]
   excludeTags?: string[]
@@ -151,6 +169,12 @@ function buildTagV2QueryParams(data: TagV2SearchPayload) {
 export async function listTagV2Catalog(domain?: string): Promise<DataEnvelope<TagV2Catalog>> {
   const query = buildQuery(domain && domain !== '全部' ? { domain } : undefined)
   const data = await apiGet<TagV2Catalog>(`/tags-v2/catalog${query}`)
+  return wrapData(data)
+}
+
+export async function listSecurityTagCatalog(keyword?: string): Promise<DataEnvelope<SecurityTagCatalog>> {
+  const query = buildQuery({ keyword, limit: 1000 })
+  const data = await apiGet<SecurityTagCatalog>(`/tags-v2/security-catalog${query}`)
   return wrapData(data)
 }
 

@@ -68,6 +68,55 @@ class TagV2Service:
         return {'domains': domains, 'tags': tags, 'dataRange': data_range}
 
     @classmethod
+    def list_security_catalog(cls, db: Session, keyword: str | None = None, limit: int = 500) -> dict[str, Any]:
+        """治安人员标签池：来自 jq_person_zj_tags，用于研判包组合检索。"""
+        clauses = ["NULLIF(TRIM(`tag_name`), '') IS NOT NULL"]
+        params: dict[str, Any] = {'limit': max(1, min(2000, int(limit or 500)))}
+        keyword_text = str(keyword or '').strip()
+        if keyword_text:
+            clauses.append("(`tag_name` LIKE :keyword OR `tag_code` LIKE :keyword)")
+            params['keyword'] = f'%{keyword_text}%'
+        sql = f"""
+            SELECT
+              MIN(`id`) AS id,
+              MAX(NULLIF(TRIM(`tag_code`), '')) AS tag_code,
+              TRIM(`tag_name`) AS tag_name,
+              COUNT(DISTINCT UPPER(TRIM(`id_no`))) AS person_count,
+              COUNT(*) AS hit_count,
+              MAX(`create_time`) AS last_tag_time
+            FROM `{PERSON_ZJ_TAGS_TABLE}`
+            WHERE {' AND '.join(clauses)}
+            GROUP BY TRIM(`tag_name`)
+            ORDER BY person_count DESC, hit_count DESC, tag_name ASC
+            LIMIT :limit
+        """
+        try:
+            rows = (db.execute(text(sql), params)).mappings().all()
+        except Exception as exc:
+            logger.warning(f'加载治安标签池失败（{PERSON_ZJ_TAGS_TABLE}）: {exc}')
+            return {'tags': []}
+        tags = []
+        for row in rows:
+            tag_name = str(row.get('tag_name') or '').strip()
+            tag_code = str(row.get('tag_code') or '').strip()
+            tags.append(
+                {
+                    'id': f'zj:{tag_code or tag_name}',
+                    'tagCode': tag_code,
+                    'tagName': tag_name,
+                    'tagPath': f'治安标签/{tag_name}',
+                    'domain': '治安标签',
+                    'name': tag_name,
+                    'category': '治安标签',
+                    'source': 'jq_person_zj_tags',
+                    'personCount': int(row.get('person_count') or 0),
+                    'hitCount': int(row.get('hit_count') or 0),
+                    'lastTagTime': cls._format_dt(row.get('last_tag_time')),
+                }
+            )
+        return {'tags': tags}
+
+    @classmethod
     def _dict_tag_to_item(cls, row: TagDictV2) -> dict[str, Any]:
         return {
             'id': row.tag_code,
@@ -608,27 +657,17 @@ class TagV2Service:
 
         for index, tag in enumerate(include):
             key = f'include_tag_{index}'
-            clauses.append(
-                f"""EXISTS (
-                  SELECT 1 FROM `{TAG_RESULT_TABLE}` ri
-                  WHERE ri.`fkdbh` = r.`fkdbh`
-                    AND (ri.`tag_path` = :{key} OR ri.`tag_path` LIKE :{key}_like OR ri.`tag_code` = :{key})
-                )"""
-            )
+            clauses.append(cls._build_any_pool_exists_sql(key, negate=False))
             params[key] = tag
             params[f'{key}_like'] = f'{tag}/%'
+            params[f'{key}_zj_name'] = cls._normalize_zj_tag_name(tag)
 
         for index, tag in enumerate(exclude):
             key = f'exclude_tag_{index}'
-            clauses.append(
-                f"""NOT EXISTS (
-                  SELECT 1 FROM `{TAG_RESULT_TABLE}` re
-                  WHERE re.`fkdbh` = r.`fkdbh`
-                    AND (re.`tag_path` = :{key} OR re.`tag_path` LIKE :{key}_like OR re.`tag_code` = :{key})
-                )"""
-            )
+            clauses.append(cls._build_any_pool_exists_sql(key, negate=True))
             params[key] = tag
             params[f'{key}_like'] = f'{tag}/%'
+            params[f'{key}_zj_name'] = cls._normalize_zj_tag_name(tag)
 
         if has_manual is True:
             clauses.append(
@@ -646,6 +685,51 @@ class TagV2Service:
             )
 
         return ' AND '.join(clauses), params
+
+    @classmethod
+    def _normalize_zj_tag_name(cls, value: str | None) -> str:
+        text_value = str(value or '').strip()
+        if text_value.startswith('治安标签/'):
+            return text_value.split('/', 1)[1].strip()
+        return text_value
+
+    @classmethod
+    def _build_any_pool_exists_sql(cls, key: str, *, negate: bool) -> str:
+        """匹配警情标签、人员抽取标签、治安标签任一标签池；多标签由外层 AND 组合。"""
+        exists_sql = f"""(
+            EXISTS (
+              SELECT 1 FROM `{TAG_RESULT_TABLE}` ri
+              WHERE ri.`fkdbh` COLLATE utf8mb4_unicode_ci = r.`fkdbh` COLLATE utf8mb4_unicode_ci
+                AND (
+                  ri.`tag_path` COLLATE utf8mb4_unicode_ci = :{key}
+                  OR ri.`tag_path` COLLATE utf8mb4_unicode_ci LIKE :{key}_like
+                  OR ri.`tag_code` COLLATE utf8mb4_unicode_ci = :{key}
+                )
+            )
+            OR EXISTS (
+              SELECT 1 FROM `{PERSON_TAG_RESULT_TABLE}` pi
+              WHERE pi.`fkdbh` COLLATE utf8mb4_unicode_ci = r.`fkdbh` COLLATE utf8mb4_unicode_ci
+                AND (
+                  pi.`tag_path` COLLATE utf8mb4_unicode_ci = :{key}
+                  OR pi.`tag_path` COLLATE utf8mb4_unicode_ci LIKE :{key}_like
+                  OR pi.`tag_code` COLLATE utf8mb4_unicode_ci = :{key}
+                )
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM `{PERSON_TAG_RESULT_TABLE}` pz
+              INNER JOIN `{PERSON_ZJ_TAGS_TABLE}` z
+                ON UPPER(TRIM(z.`id_no`)) COLLATE utf8mb4_unicode_ci = UPPER(TRIM(pz.`id_no`)) COLLATE utf8mb4_unicode_ci
+              WHERE pz.`fkdbh` COLLATE utf8mb4_unicode_ci = r.`fkdbh` COLLATE utf8mb4_unicode_ci
+                AND NULLIF(TRIM(pz.`id_no`), '') IS NOT NULL
+                AND (
+                  z.`tag_code` COLLATE utf8mb4_unicode_ci = :{key}
+                  OR TRIM(z.`tag_name`) COLLATE utf8mb4_unicode_ci = :{key}_zj_name
+                  OR CONCAT('治安标签/', TRIM(z.`tag_name`)) COLLATE utf8mb4_unicode_ci = :{key}
+                )
+            )
+        )"""
+        return f'NOT {exists_sql}' if negate else exists_sql
 
     @classmethod
     def _load_fkd_by_fkdbh(cls, db: Session, fkdbh_list: list[str]) -> dict[str, dict[str, Any]]:
